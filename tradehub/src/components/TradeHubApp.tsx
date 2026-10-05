@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { usePosts } from "../hooks/usePosts";
+import { usePosts } from "@/hooks/usePosts";
 import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
 import { generateUniqueName } from "@/lib/generateUniqueName";
 import {
@@ -41,8 +41,16 @@ export default function TradeHubApp() {
   const [profile, setProfile] = useLocalStorage<UserProfile>("tradehub_profile", defaultProfile);
   const [categories, setCategories] = useState<Category[]>([]); // loaded from the API
   const [storeError, setStoreError] = useState<string | null>(null);
-  // My posts, loaded from the API (the hook owns load / create / delete)
-  const { posts, myId, error: postsError, createPost, deletePost, toggleLike } = usePosts();
+  // My posts, loaded from the API (the hook owns load / create / edit / delete / like)
+  const {
+    posts,
+    myId,
+    error: postsError,
+    createPost,
+    editPost,
+    deletePost,
+    toggleLike,
+  } = usePosts();
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -213,7 +221,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
   };
 
   // =========================================
-  // POST HANDLERS  (load / create / delete live in usePosts)
+  // POST HANDLERS  (load / create / edit / delete / like live in usePosts)
   // =========================================
   // A post carries its real product, so ordering from a post is ordering that product.
   const handleOrderFromPost = (post: Post) => {
@@ -257,6 +265,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
         currentUserId={myId}
         error={postsError}
         onCreatePost={createPost}
+        onEditPost={editPost}
         onDeletePost={deletePost}
         onToggleLike={toggleLike}
         onOrderPost={handleOrderFromPost}

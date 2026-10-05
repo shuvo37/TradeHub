@@ -24,7 +24,7 @@ export default function HomePage() {
   // Categories (with their products) come from the API; the Composer needs them to attach a product.
   const [categories, setCategories] = useState<Category[]>([]);
   // For now Home shows my own posts, same as the Profile page. The real feed rule comes later.
-  const { posts, myId, error, createPost, deletePost, toggleLike } = usePosts();
+  const { posts, myId, error, createPost, editPost, deletePost, toggleLike } = usePosts();
   const [orderingProduct, setOrderingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
@@ -72,6 +72,7 @@ export default function HomePage() {
                 key={post.id}
                 post={post}
                 currentUserId={myId}
+                onEdit={editPost}
                 onDelete={deletePost}
                 onToggleLike={toggleLike}
                 onOrder={handleOrderPost}

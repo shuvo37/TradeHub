@@ -41,6 +41,12 @@ export async function createPost(input: NewPost): Promise<Post> {
   return toPost((await res.json()) as PostDto);
 }
 
+// 204 No Content. Only the text can change; the image and the attached product stay as they are.
+// The backend answers "A post needs text, an image, or a product" if nothing would be left.
+export async function updatePostText(id: string, text: string): Promise<void> {
+  await apiRequest(`/api/posts/${id}`, jsonInit("PUT", { text }));
+}
+
 // 204 No Content; the backend also deletes the post's comments
 export async function deletePost(id: string): Promise<void> {
   await apiRequest(`/api/posts/${id}`, { method: "DELETE" });

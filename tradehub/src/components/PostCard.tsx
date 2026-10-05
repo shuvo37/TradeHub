@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Post } from "@/types/profile";
+import CommentSection from "./CommentSection";
 
 interface Props {
   post: Post;
@@ -27,6 +28,9 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
   const [showMenu, setShowMenu] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likePulse, setLikePulse] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  // The comment count lives here, because only this card and its comment list change it.
+  const [commentCount, setCommentCount] = useState(post.commentCount);
 
   const handleLikeClick = async () => {
     // One request at a time: two quick clicks could otherwise reach the server in the wrong order.
@@ -191,8 +195,8 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
         </div>
       )}
 
-      {/* Engagement Summary (the Comment button comes back in the next step) */}
-      {(post.likeCount > 0 || post.commentCount > 0) && (
+      {/* Engagement Summary */}
+      {(post.likeCount > 0 || commentCount > 0) && (
         <div className="px-3 sm:px-4 py-2 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100">
           <div className="flex items-center gap-1">
             {post.likeCount > 0 && (
@@ -206,15 +210,15 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
               </>
             )}
           </div>
-          {post.commentCount > 0 && (
-            <span>
-              {post.commentCount} {post.commentCount === 1 ? "comment" : "comments"}
-            </span>
+          {commentCount > 0 && (
+            <button onClick={() => setShowComments(!showComments)} className="hover:underline">
+              {commentCount} {commentCount === 1 ? "comment" : "comments"}
+            </button>
           )}
         </div>
       )}
 
-      {/* Action Buttons (Comment comes back in the next step) */}
+      {/* Action Buttons */}
       <div className="px-2 py-1 border-t border-gray-100 flex">
         <button
           onClick={handleLikeClick}
@@ -237,7 +241,36 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
           </svg>
           Like
         </button>
+        <button
+          onClick={() => setShowComments(!showComments)}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+          Comment
+        </button>
       </div>
+
+      {/* Comments (fetched when opened) */}
+      {showComments && (
+        <CommentSection
+          postId={post.id}
+          postAuthorId={post.authorId}
+          currentUserId={currentUserId}
+          setCommentCount={setCommentCount}
+        />
+      )}
     </article>
   );
 }

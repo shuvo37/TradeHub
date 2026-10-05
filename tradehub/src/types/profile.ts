@@ -53,3 +53,14 @@ export interface Post {
   commentCount: number;
   likedByMe: boolean;
 }
+
+// A comment as the backend sends it (CommentDto). A post's comments come oldest first.
+export interface Comment {
+  id: string;
+  postId: string;
+  text: string;
+  createdAt: string;      // ISO date
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;   // "" when the author has no avatar
+}

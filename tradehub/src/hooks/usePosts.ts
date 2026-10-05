@@ -6,6 +6,7 @@ import { ensureUser } from "@/lib/auth-store";
 import {
   fetchPostsByUser,
   createPost as createPostApi,
+  updatePostText,
   deletePost as deletePostApi,
   likePost as likePostApi,
   unlikePost as unlikePostApi,
@@ -17,7 +18,7 @@ const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Something went wrong";
 
 // The logged-in user's posts: loads them once, and keeps the list in sync with the server.
-// Profile and Home both use this, so the load/create/delete/like logic exists in one place.
+// Profile and Home both use this, so the load/create/edit/delete/like logic exists in one place.
 export function usePosts() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
@@ -40,6 +41,14 @@ export function usePosts() {
   const createPost = async (input: NewPost) => {
     const created = await createPostApi(input);
     setPosts((prev) => [created, ...prev]); // newest first, same as the server's order
+    setError(null);
+  };
+
+  // Throws on failure: the post card shows the message and stays in edit mode.
+  // The server trims the text, so the list stores the trimmed text too.
+  const editPost = async (postId: string, text: string) => {
+    await updatePostText(postId, text);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, text: text.trim() } : p)));
     setError(null);
   };
 
@@ -80,5 +89,5 @@ export function usePosts() {
     }
   };
 
-  return { posts, myId, error, createPost, deletePost, toggleLike };
+  return { posts, myId, error, createPost, editPost, deletePost, toggleLike };
 }
