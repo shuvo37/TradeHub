@@ -3,14 +3,14 @@
 
 import { useEffect, useState } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { usePosts } from "@/hooks/usePosts";
+import { fetchCategories } from "@/lib/store-api";
 import {
   UserProfile,
   defaultProfile,
   Category,
   Product,
   Post,
-  Comment,
-  OrderItem,
 } from "@/types/profile";
 import Composer from "@/components/Composer";
 import PostCard from "@/components/PostCard";
@@ -18,74 +18,28 @@ import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModa
 import { HomeTopBar, MobileTabBar } from "./HomeTopBar";
 import { LeftRail, RightRail } from "./HomeSideRails";
 
-type PostDraft = { text: string; image?: string; orderItem?: OrderItem };
-
-export default function page() {
-  // Same localStorage keys as TradeHubApp, so posts are shared with the profile page.
+export default function HomePage() {
+  // The profile is still the localStorage prototype (wired in a later step).
   const [profile] = useLocalStorage<UserProfile>("tradehub_profile", defaultProfile);
-  const [categories] = useLocalStorage<Category[]>("tradehub_categories", []);
-  const [posts, setPosts] = useLocalStorage<Post[]>("tradehub_posts", []);
+  // Categories (with their products) come from the API; the Composer needs them to attach a product.
+  const [categories, setCategories] = useState<Category[]>([]);
+  // For now Home shows my own posts, same as the Profile page. The real feed rule comes later.
+  const { posts, myId, error, createPost, deletePost, toggleLike } = usePosts();
   const [orderingProduct, setOrderingProduct] = useState<Product | null>(null);
+
+  useEffect(() => {
+    fetchCategories()
+      .then(setCategories)
+      .catch((err) => console.error(err));
+  }, []);
 
   // localStorage only exists in the browser; wait for mount so server and client HTML match.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="min-h-[100dvh] bg-slate-100" />;
 
-  const handleCreatePost = (draft: PostDraft) => {
-    const post: Post = {
-      id: Date.now().toString(),
-      text: draft.text,
-      image: draft.image,
-      orderItem: draft.orderItem,
-      comments: [],
-      createdAt: Date.now(),
-      likes: 0,
-      likedByMe: false,
-    };
-    setPosts(prev => [post, ...prev]);
-  };
-
-  const handleDeletePost = (postId: string) =>
-    setPosts(prev => prev.filter(p => p.id !== postId));
-
-  const handleAddComment = (postId: string, text: string) => {
-    const comment: Comment = {
-      id: Date.now().toString(),
-      authorName: profile.name,
-      authorAvatar: profile.avatar,
-      text,
-      createdAt: Date.now(),
-    };
-    setPosts(prev =>
-      prev.map(p => (p.id === postId ? { ...p, comments: [...p.comments, comment] } : p))
-    );
-  };
-
-  const handleToggleLike = (postId: string) =>
-    setPosts(prev =>
-      prev.map(p =>
-        p.id !== postId
-          ? p
-          : {
-              ...p,
-              likedByMe: !p.likedByMe,
-              likes: p.likedByMe ? Math.max(0, (p.likes ?? 0) - 1) : (p.likes ?? 0) + 1,
-            }
-      )
-    );
-
   const handleOrderPost = (post: Post) => {
-    if (!post.orderItem) return;
-    setOrderingProduct({
-      id: `post-${post.id}`,
-      name: post.orderItem.name,
-      price: post.orderItem.price,
-      description: post.orderItem.description,
-      image: post.orderItem.image ?? "",
-      quantity: post.orderItem.quantity,
-      discount: post.orderItem.discount,
-    });
+    if (post.product) setOrderingProduct(post.product);
   };
 
   const handleSubmitOrder = (data: OrderFormData) => {
@@ -101,7 +55,9 @@ export default function page() {
         <LeftRail profile={profile} />
 
         <main className="flex w-full min-w-0 max-w-2xl flex-col gap-3 sm:gap-4">
-          <Composer profile={profile} categories={categories} onPublish={handleCreatePost} />
+          <Composer profile={profile} categories={categories} onPublish={createPost} />
+
+          {error && <p className="px-1 text-xs text-red-600">{error}</p>}
 
           {posts.length === 0 ? (
             <div className="flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm">
@@ -115,10 +71,9 @@ export default function page() {
               <PostCard
                 key={post.id}
                 post={post}
-                profile={profile}
-                onDelete={handleDeletePost}
-                onAddComment={handleAddComment}
-                onToggleLike={handleToggleLike}
+                currentUserId={myId}
+                onDelete={deletePost}
+                onToggleLike={toggleLike}
                 onOrder={handleOrderPost}
               />
             ))

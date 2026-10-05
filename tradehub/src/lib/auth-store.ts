@@ -43,3 +43,9 @@ export function refreshSession(): Promise<AuthResponse | null> {
   })();
   return refreshing;
 }
+
+// The logged-in user. After a page reload the in-memory session is gone, so this restores it
+// from the refresh cookie first (sharing the single refresh above). null = not logged in.
+export async function ensureUser(): Promise<AuthResponse | null> {
+  return currentUser ?? (await refreshSession());
+}

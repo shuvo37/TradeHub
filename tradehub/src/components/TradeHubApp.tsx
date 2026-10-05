@@ -3,15 +3,24 @@
 
 import { useState, useEffect } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { usePosts } from "../hooks/usePosts";
 import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
 import { generateUniqueName } from "@/lib/generateUniqueName";
+import {
+  fetchCategories,
+  createCategory,
+  renameCategory,
+  deleteCategory,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+} from "@/lib/store-api";
 import {
   UserProfile,
   defaultProfile,
   Category,
   Product,
   Post,
-  Comment,
 } from "@/types/profile";
 import Sidebar from "@/components/Sidebar";
 import Feed from "@/components/Feed";
@@ -21,11 +30,19 @@ import ProductFormModal from "@/components/modals/ProductFormModal";
 import ViewProductModal from "@/components/modals/ViewProductModal";
 import DeleteCategoryModal from "@/components/modals/DeleteCategoryModal";
 
+const errorMessage = (err: unknown) =>
+  err instanceof Error ? err.message : "Something went wrong";
+
+// Same order the backend uses (by name), so a new/renamed category lands where a reload would put it.
+const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
+
 export default function TradeHubApp() {
   // --- Global State ---
   const [profile, setProfile] = useLocalStorage<UserProfile>("tradehub_profile", defaultProfile);
-  const [categories, setCategories] = useLocalStorage<Category[]>("tradehub_categories", []);
-  const [posts, setPosts] = useLocalStorage<Post[]>("tradehub_posts", []);
+  const [categories, setCategories] = useState<Category[]>([]); // loaded from the API
+  const [storeError, setStoreError] = useState<string | null>(null);
+  // My posts, loaded from the API (the hook owns load / create / delete)
+  const { posts, myId, error: postsError, createPost, deletePost, toggleLike } = usePosts();
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -39,22 +56,12 @@ export default function TradeHubApp() {
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [orderingProduct, setOrderingProduct] = useState<Product | null>(null);
 
-  // --- Migration: Add default like fields to old posts ---
-    // --- Migration: Add default like fields to old posts ---
+  // --- Load My Store (categories + products) from the backend ---
   useEffect(() => {
-    const needsMigration = posts.some(p => p.likes === undefined || p.likedByMe === undefined);
-    if (needsMigration) {
-      setPosts(
-        posts.map(p => ({
-          ...p,
-          likes: p.likes ?? 0,
-          likedByMe: p.likedByMe ?? false,
-        }))
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchCategories()
+      .then(setCategories)
+      .catch((err) => setStoreError(errorMessage(err)));
   }, []);
-
 
   // --- Migration + first-time setup for profile ---
   // Backfills new fields on old profiles, renames bio→necessaryInfo,
@@ -87,7 +94,7 @@ export default function TradeHubApp() {
 
 
   // =========================================
-  // PRODUCT HANDLERS
+  // PRODUCT HANDLERS  (API first; they throw on failure and ProductFormModal shows the message)
   // =========================================
   const handleOpenProductModal = (product: Product | null, categoryId: string) => {
     setEditingProduct(product);
@@ -96,53 +103,52 @@ export default function TradeHubApp() {
     setIsProductModalOpen(true);
   };
 
-  const handleSaveProduct = () => {
-    if (!currentCategoryIdForProduct || !tempProduct.name) return;
-
-    const newProduct: Product = {
-      id: editingProduct?.id || Date.now().toString(),
-      name: tempProduct.name || "",
-      price: tempProduct.price || "",
-      description: tempProduct.description || "",
-      image: tempProduct.image || "",
-      quantity: tempProduct.quantity ?? "Available",
-      discount: tempProduct.discount,
-    };
-
-    setCategories(
-      categories.map(cat => {
-        if (cat.id === currentCategoryIdForProduct) {
-          const existingProducts = editingProduct
-            ? cat.products.map(p => (p.id === newProduct.id ? newProduct : p))
-            : [...cat.products, newProduct];
-          return { ...cat, products: existingProducts };
-        }
-        return cat;
-      })
-    );
-
+  const closeProductModal = () => {
     setIsProductModalOpen(false);
     setEditingProduct(null);
     setTempProduct({});
     setCurrentCategoryIdForProduct(null);
   };
 
-  const handleDeleteProduct = () => {
-    if (!currentCategoryIdForProduct || !editingProduct) return;
+  const handleSaveProduct = async () => {
+    if (!currentCategoryIdForProduct) return;
+    const categoryId = currentCategoryIdForProduct;
 
-    setCategories(
-      categories.map(cat => {
-        if (cat.id === currentCategoryIdForProduct) {
-          return { ...cat, products: cat.products.filter(p => p.id !== editingProduct.id) };
-        }
-        return cat;
+    const saved = editingProduct
+      ? await updateProduct(editingProduct.id, tempProduct)
+      : await createProduct(categoryId, tempProduct);
+
+    setCategories((prev) =>
+      prev.map((cat) => {
+        if (cat.id !== categoryId) return cat;
+        return {
+          ...cat,
+          products: editingProduct
+            ? cat.products.map((p) => (p.id === saved.id ? saved : p))
+            : [...cat.products, saved],
+        };
       })
     );
 
-    setIsProductModalOpen(false);
-    setEditingProduct(null);
-    setTempProduct({});
-    setCurrentCategoryIdForProduct(null);
+    closeProductModal();
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!currentCategoryIdForProduct || !editingProduct) return;
+    const categoryId = currentCategoryIdForProduct;
+    const productId = editingProduct.id;
+
+    await deleteProduct(productId);
+
+    setCategories((prev) =>
+      prev.map((cat) =>
+        cat.id === categoryId
+          ? { ...cat, products: cat.products.filter((p) => p.id !== productId) }
+          : cat
+      )
+    );
+
+    closeProductModal();
   };
 
   const handleOpenProductFromView = (product: Product, e: React.MouseEvent) => {
@@ -162,97 +168,57 @@ const handleSubmitOrder = (data: OrderFormData) => {
 };
 
   // =========================================
-  // CATEGORY HANDLERS
+  // CATEGORY HANDLERS  (API first, state only after the server says OK)
   // =========================================
-  const handleConfirmDeleteCategory = () => {
-    if (!deletingCategory) return;
-    setCategories(categories.filter(cat => cat.id !== deletingCategory.id));
-    if (activeCategoryId === deletingCategory.id) setActiveCategoryId(null);
-    setDeletingCategory(null);
+  // Returns true on success so the Sidebar knows whether to close its input.
+  const handleAddCategory = async (name: string): Promise<boolean> => {
+    try {
+      const created = await createCategory(name);
+      setCategories((prev) => [...prev, created].sort(byName));
+      setActiveCategoryId(created.id);
+      setStoreError(null);
+      return true;
+    } catch (err) {
+      setStoreError(errorMessage(err));
+      return false;
+    }
   };
 
-  const handleRenameCategory = (categoryId: string, newName: string) => {
+  const handleRenameCategory = async (categoryId: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    setCategories(
-      categories.map(cat => (cat.id === categoryId ? { ...cat, name: trimmed } : cat))
-    );
+    try {
+      await renameCategory(categoryId, trimmed);
+      setCategories((prev) =>
+        prev.map((cat) => (cat.id === categoryId ? { ...cat, name: trimmed } : cat)).sort(byName)
+      );
+      setStoreError(null);
+    } catch (err) {
+      setStoreError(errorMessage(err));
+    }
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deletingCategory) return;
+    const category = deletingCategory;
+    setDeletingCategory(null); // close the modal first so a double click can't send two deletes
+    try {
+      await deleteCategory(category.id);
+      setCategories((prev) => prev.filter((cat) => cat.id !== category.id));
+      if (activeCategoryId === category.id) setActiveCategoryId(null);
+      setStoreError(null);
+    } catch (err) {
+      setStoreError(errorMessage(err));
+    }
   };
 
   // =========================================
-  // POST HANDLERS
+  // POST HANDLERS  (load / create / delete live in usePosts)
   // =========================================
-  const handleCreatePost = (newPost: {
-    text: string;
-    image?: string;
-    orderItem?: {
-      name: string;
-      price: string;
-      description: string;
-      image?: string;
-      quantity: number | "Available" | "Unavailable";
-      discount?: number;
-
-    };
-  }) => {
-    const post: Post = {
-      id: Date.now().toString(),
-      text: newPost.text,
-      image: newPost.image,
-      orderItem: newPost.orderItem,
-      comments: [],
-      createdAt: Date.now(),
-      likes: 0,
-      likedByMe: false,
-    };
-    setPosts([post, ...posts]);
-  };
-
-  const handleDeletePost = (postId: string) => {
-    setPosts(posts.filter(p => p.id !== postId));
-  };
-
-  const handleAddComment = (postId: string, text: string) => {
-    const comment: Comment = {
-      id: Date.now().toString(),
-      authorName: profile.name,
-      authorAvatar: profile.avatar,
-      text,
-      createdAt: Date.now(),
-    };
-    setPosts(
-      posts.map(p => (p.id === postId ? { ...p, comments: [...p.comments, comment] } : p))
-    );
-  };
-
-  const handleToggleLike = (postId: string) => {
-    setPosts(
-      posts.map(p => {
-        if (p.id !== postId) return p;
-        const isLiked = p.likedByMe;
-        return {
-          ...p,
-          likedByMe: !isLiked,
-          likes: isLiked ? Math.max(0, (p.likes ?? 0) - 1) : (p.likes ?? 0) + 1,
-        };
-      })
-    );
-  };
-
-  
+  // A post carries its real product, so ordering from a post is ordering that product.
   const handleOrderFromPost = (post: Post) => {
-  if (!post.orderItem) return;
-  const syntheticProduct: Product = {
-    id: `post-${post.id}`,
-    name: post.orderItem.name,
-    price: post.orderItem.price,
-    description: post.orderItem.description,
-    image: post.orderItem.image ?? "",
-    quantity: post.orderItem.quantity,
-    discount: post.orderItem.discount,
+    if (post.product) setOrderingProduct(post.product);
   };
-  setOrderingProduct(syntheticProduct);
-};
 
   // =========================================
   // RENDER
@@ -271,11 +237,12 @@ const handleSubmitOrder = (data: OrderFormData) => {
         profile={profile}
         setProfile={setProfile}
         categories={categories}
-        setCategories={setCategories}
+        storeError={storeError}
         activeCategoryId={activeCategoryId}
         setActiveCategoryId={setActiveCategoryId}
         openProductModal={handleOpenProductModal}
         setViewingProduct={setViewingProduct}
+        onAddCategory={handleAddCategory}
         onRequestDeleteCategory={setDeletingCategory}
         onRenameCategory={handleRenameCategory}
         isDrawerOpen={isDrawerOpen}
@@ -287,10 +254,11 @@ const handleSubmitOrder = (data: OrderFormData) => {
         profile={profile}
         categories={categories}
         posts={posts}
-        onCreatePost={handleCreatePost}
-        onDeletePost={handleDeletePost}
-        onAddComment={handleAddComment}
-        onToggleLike={handleToggleLike}
+        currentUserId={myId}
+        error={postsError}
+        onCreatePost={createPost}
+        onDeletePost={deletePost}
+        onToggleLike={toggleLike}
         onOrderPost={handleOrderFromPost}
         />
 

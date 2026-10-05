@@ -3,22 +3,13 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import { UserProfile, Category, Product } from "@/types/profile";
+import { uploadImage } from "@/lib/api";
+import type { NewPost } from "@/lib/posts-api";
 
 interface Props {
   profile: UserProfile;
   categories: Category[];
-  onPublish: (post: {
-    text: string;
-    image?: string;
-    orderItem?: {
-      name: string;
-      price: string;
-      description: string;
-      image?: string;
-      quantity: number | "Available" | "Unavailable";
-      discount?: number;
-    };
-  }) => void;
+  onPublish: (post: NewPost) => Promise<void>;
 }
 
 export default function Composer({ profile, categories, onPublish }: Props) {
@@ -27,6 +18,9 @@ export default function Composer({ profile, categories, onPublish }: Props) {
   const [attachedProduct, setAttachedProduct] = useState<Product | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Category picker state
   const [categorySearch, setCategorySearch] = useState("");
@@ -70,7 +64,8 @@ export default function Composer({ profile, categories, onPublish }: Props) {
     return scopedProducts.filter(({ product }) => product.name.toLowerCase().includes(q));
   }, [scopedProducts, productSearch]);
 
-  const canPublish = text.trim().length > 0 || !!image || !!attachedProduct;
+  const canPublish =
+    (text.trim().length > 0 || !!image || !!attachedProduct) && !imageUploading && !publishing;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -84,12 +79,20 @@ export default function Composer({ profile, categories, onPublish }: Props) {
     }
   }, [showCategoryDropdown]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // The photo is uploaded right away; `image` holds the returned URL, which is all the post needs.
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result as string);
-      reader.readAsDataURL(file);
+    e.target.value = ""; // lets the user pick the same file again after an error
+    if (!file) return;
+
+    setError(null);
+    setImageUploading(true);
+    try {
+      setImage(await uploadImage(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setImageUploading(false);
     }
   };
 
@@ -111,23 +114,23 @@ export default function Composer({ profile, categories, onPublish }: Props) {
     setShowCategoryDropdown(false);
   };
 
-  const handlePublish = () => {
-    if (!text.trim() && !image && !attachedProduct) return;
+  const handlePublish = async () => {
+    if (!canPublish) return;
 
-    onPublish({
-      text: text.trim(),
-      image,
-      orderItem: attachedProduct
-        ? {
-            name: attachedProduct.name,
-            price: attachedProduct.price,
-            description: attachedProduct.description,
-            image: attachedProduct.image,
-            quantity: attachedProduct.quantity,
-            discount: attachedProduct.discount,
-          }
-        : undefined,
-    });
+    setError(null);
+    setPublishing(true);
+    try {
+      await onPublish({
+        text: text.trim(),
+        image,
+        productId: attachedProduct?.id, // the post points at the real product
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      return; // keep the draft so nothing is lost
+    } finally {
+      setPublishing(false);
+    }
 
     setText("");
     setImage(undefined);
@@ -221,6 +224,9 @@ export default function Composer({ profile, categories, onPublish }: Props) {
             </div>
           )}
 
+          {imageUploading && <p className="text-xs text-gray-500">Uploading image...</p>}
+          {error && <p className="text-xs text-red-600">{error}</p>}
+
           {/* Action Bar */}
           <div className="flex items-center justify-between pt-2 border-t border-gray-100 gap-2">
             <div className="flex gap-1 min-w-0">
@@ -247,7 +253,7 @@ export default function Composer({ profile, categories, onPublish }: Props) {
                 type="file"
                 ref={imageInputRef}
                 onChange={handleImageUpload}
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
               />
 
@@ -286,7 +292,7 @@ export default function Composer({ profile, categories, onPublish }: Props) {
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
             >
-              Post
+              {publishing ? "Posting..." : "Post"}
             </button>
           </div>
 

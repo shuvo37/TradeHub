@@ -9,11 +9,12 @@ interface Props {
   profile: UserProfile;
   setProfile: (p: UserProfile) => void;
   categories: Category[];
-  setCategories: (c: Category[]) => void;
+  storeError: string | null;
   activeCategoryId: string | null;
   setActiveCategoryId: (id: string | null) => void;
   openProductModal: (product: Product | null, categoryId: string) => void;
   setViewingProduct: (p: Product | null) => void;
+  onAddCategory: (name: string) => Promise<boolean>;
   onRequestDeleteCategory: (category: Category) => void;
   onRenameCategory: (categoryId: string, newName: string) => void;
   isDrawerOpen: boolean;
@@ -24,11 +25,12 @@ export default function Sidebar({
   profile,
   setProfile,
   categories,
-  setCategories,
+  storeError,
   activeCategoryId,
   setActiveCategoryId,
   openProductModal,
   setViewingProduct,
+  onAddCategory,
   onRequestDeleteCategory,
   onRenameCategory,
   isDrawerOpen,
@@ -121,15 +123,13 @@ export default function Sidebar({
   };
 
   // --- Category Handlers ---
-  const handleAddCategory = () => {
-    if (!newCategoryName.trim()) return;
-    const newCategory: Category = {
-      id: Date.now().toString(),
-      name: newCategoryName,
-      products: [],
-    };
-    setCategories([...categories, newCategory]);
-    setActiveCategoryId(newCategory.id);
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+
+    const ok = await onAddCategory(name);
+    if (!ok) return; // keep the input open so the user can fix the name
+
     setNewCategoryName("");
     setIsAddingCategory(false);
     setCategorySearch(""); // Clear search so new category is visible
@@ -471,6 +471,8 @@ export default function Sidebar({
                 +
               </button>
             </div>
+
+            {storeError && <p className="text-xs text-red-600">{storeError}</p>}
 
             {/* Category Search */}
             {showSearch && (

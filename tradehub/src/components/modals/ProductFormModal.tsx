@@ -1,16 +1,17 @@
 // src/components/modals/ProductFormModal.tsx
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { Product } from "@/types/profile";
+import { uploadImage } from "@/lib/api";
 
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
-  onDelete: () => void;
+  onSave: () => Promise<void>;
+  onDelete: () => Promise<void>;
   editingProduct: Product | null;
   tempProduct: Partial<Product>;
-  setTempProduct: (p: Partial<Product>) => void;
+  setTempProduct: Dispatch<SetStateAction<Partial<Product>>>;
 }
 
 type QuantityMode = "Available" | "Unavailable" | "Numeric";
@@ -26,6 +27,9 @@ export default function ProductFormModal({
 }: Props) {
   const productImageRef = useRef<HTMLInputElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const initialMode: QuantityMode =
     tempProduct.quantity === "Available"
@@ -53,18 +57,49 @@ export default function ProductFormModal({
         : "Numeric";
     setQuantityMode(mode);
     setConfirmDelete(false);
+    setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editingProduct?.id]);
 
   if (!isOpen) return null;
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () =>
-        setTempProduct({ ...tempProduct, image: reader.result as string });
-      reader.readAsDataURL(file);
+    e.target.value = ""; // lets the user pick the same file again after an error
+    if (!file) return;
+
+    setError(null);
+    setImageUploading(true);
+    try {
+      const url = await uploadImage(file);
+      // functional update: the user may have typed in other fields while the upload ran
+      setTempProduct((prev) => ({ ...prev, image: url }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setImageUploading(false);
     }
+  };
+
+  // Runs onSave / onDelete, keeps the buttons disabled meanwhile, and shows the server's message on failure.
+  // On success the parent closes the modal. Returns true when it worked.
+  const run = async (action: () => Promise<void>): Promise<boolean> => {
+    setError(null);
+    setSaving(true);
+    try {
+      await action();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const ok = await run(onDelete);
+    if (!ok) setConfirmDelete(false); // close the confirm card so the error line is visible
   };
 
   const handleQuantityToggle = (mode: QuantityMode) => {
@@ -102,7 +137,7 @@ export default function ProductFormModal({
 
         <div
           className="w-full h-40 rounded-xl bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer overflow-hidden relative shrink-0"
-          onClick={() => productImageRef.current?.click()}
+          onClick={() => !imageUploading && productImageRef.current?.click()}
         >
           {tempProduct.image ? (
             <img src={tempProduct.image} alt="Preview" className="w-full h-full object-cover" />
@@ -111,12 +146,17 @@ export default function ProductFormModal({
               <p className="text-sm font-medium">Click to upload image</p>
             </div>
           )}
+          {imageUploading && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white text-xs font-semibold">Uploading...</span>
+            </div>
+          )}
         </div>
         <input
           type="file"
           ref={productImageRef}
           onChange={handleImageUpload}
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           className="hidden"
         />
 
@@ -227,6 +267,8 @@ export default function ProductFormModal({
           className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         />
 
+        {error && <p className="text-xs text-red-600">{error}</p>}
+
                <div className="flex gap-3 mt-2 sticky bottom-0 bg-white pt-2 safe-bottom">
           <button
             onClick={onClose}
@@ -235,10 +277,11 @@ export default function ProductFormModal({
             Cancel
           </button>
           <button
-            onClick={onSave}
-            className="flex-1 py-2.5 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-700"
+            onClick={() => run(onSave)}
+            disabled={saving || imageUploading}
+            className="flex-1 py-2.5 rounded-lg bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Save Product
+            {imageUploading ? "Uploading..." : saving ? "Saving..." : "Save Product"}
           </button>
         </div>
       </div>
@@ -317,10 +360,11 @@ export default function ProductFormModal({
                 Cancel
               </button>
               <button
-                onClick={onDelete}
-                className="flex-1 py-2.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 active:bg-red-800 shadow-sm shadow-red-200 transition-colors"
+                onClick={handleDelete}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 active:bg-red-800 shadow-sm shadow-red-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Delete Product
+                {saving ? "Deleting..." : "Delete Product"}
               </button>
             </div>
           </div>

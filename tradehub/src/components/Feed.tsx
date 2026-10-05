@@ -2,6 +2,7 @@
 "use client";
 
 import { Post, UserProfile, Category } from "@/types/profile";
+import type { NewPost } from "@/lib/posts-api";
 import Composer from "./Composer";
 import PostCard from "./PostCard";
 
@@ -9,21 +10,11 @@ interface Props {
   profile: UserProfile;
   categories: Category[];
   posts: Post[];
-  onCreatePost: (post: {
-    text: string;
-    image?: string;
-    orderItem?: {
-      name: string;
-      price: string;
-      description: string;
-      image?: string;
-      quantity: number | "Available" | "Unavailable";
-      discount?: number;
-    };
-  }) => void;
+  currentUserId: string | null;
+  error: string | null;
+  onCreatePost: (post: NewPost) => Promise<void>;
   onDeletePost: (postId: string) => void;
-  onAddComment: (postId: string, text: string) => void;
-  onToggleLike: (postId: string) => void;
+  onToggleLike: (postId: string) => Promise<void>;
   onOrderPost: (post: Post) => void;
 }
 
@@ -31,9 +22,10 @@ export default function Feed({
   profile,
   categories,
   posts,
+  currentUserId,
+  error,
   onCreatePost,
   onDeletePost,
-  onAddComment,
   onToggleLike,
   onOrderPost,
 }: Props) {
@@ -41,6 +33,8 @@ export default function Feed({
     <main className="flex-1 h-[100dvh] overflow-y-auto bg-gray-100 pt-14 pb-16 md:pt-0 md:pb-0">
       <div className="max-w-2xl mx-auto p-3 sm:p-4 md:p-6 flex flex-col gap-3 sm:gap-4">
       {/*<Composer profile={profile} categories={categories} onPublish={onCreatePost} />*/}
+
+        {error && <p className="text-xs text-red-600 px-1">{error}</p>}
 
         {posts.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 sm:p-12 flex flex-col items-center text-center">
@@ -70,9 +64,8 @@ export default function Feed({
                 <PostCard
                 key={post.id}
                 post={post}
-                profile={profile}
+                currentUserId={currentUserId}
                 onDelete={onDeletePost}
-                onAddComment={onAddComment}
                 onToggleLike={onToggleLike}
                 onOrder={onOrderPost}
                 />

@@ -63,6 +63,27 @@ export async function authFetch(path: string, init: RequestInit = {}): Promise<R
   return res;
 }
 
+// The request used by the feature api files (store-api, posts-api):
+// authFetch, plus a readable message for a network failure,
+// plus an Error carrying the backend's own message for a 4xx/5xx.
+export async function apiRequest(path: string, init: RequestInit = {}): Promise<Response> {
+  let res: Response;
+  try {
+    res = await authFetch(path, init);
+  } catch {
+    throw new Error("Can't reach the server. Is the backend running?");
+  }
+  if (!res.ok) throw new Error(await readError(res));
+  return res;
+}
+
+// Request options for a call that sends a JSON body.
+export const jsonInit = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
 // Uploads one image through the backend (which talks to Cloudinary) and returns its URL.
 // The form field must be named "file" to match the controller parameter.
 export async function uploadImage(file: File): Promise<string> {

@@ -28,7 +28,7 @@ export interface Product {
   price: string;
   description: string;
   image: string;
-  quantity: number | "Available" | "Unavailable"; 
+  quantity: number | "Available" | "Unavailable";
   discount?: number;
 }
 
@@ -38,33 +38,18 @@ export interface Category {
   products: Product[];
 }
 
-// --- NEW: Posts & Comments ---
-export interface Comment {
-  id: string;
-  authorName: string;
-  authorAvatar: string;
-  text: string;
-  createdAt: number;
-}
-
-export interface OrderItem {
-  name: string;
-  price: string;
-  description: string;
-  image?: string;
-  quantity: number | "Available" | "Unavailable";
-  discount?: number;
-
-}
-
-// src/types/profile.ts
+// A post as the backend sends it (PostDto). The attached product is already converted
+// to the Product shape above, so the UI uses it exactly like a product from My Store.
 export interface Post {
   id: string;
   text: string;
-  image?: string;
-  orderItem?: OrderItem;
-  comments: Comment[];
-  createdAt: number;
-  likes: number;          // <-- NEW
-  likedByMe: boolean;     // <-- NEW
+  image: string;          // "" when the post has no image
+  createdAt: string;      // ISO date, e.g. "2026-10-05T04:10:00+00:00"
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;   // "" when the author has no avatar
+  product: Product | null; // the attached product, or null
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
 }

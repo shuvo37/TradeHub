@@ -7,9 +7,9 @@ import Register from "./auth/Register/page";
 
 
 export default function Page() {
- return <TradeHubApp />;
+// return <TradeHubApp />;
 
-// return <LoginPage/>
+ return <LoginPage/>
 
 // return <Register/>
 
