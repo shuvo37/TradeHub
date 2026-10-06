@@ -2,10 +2,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useProfile } from "@/hooks/useProfile";
 import { usePosts } from "@/hooks/usePosts";
 import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
-import { generateUniqueName } from "@/lib/generateUniqueName";
 import {
   fetchCategories,
   createCategory,
@@ -15,13 +14,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "@/lib/store-api";
-import {
-  UserProfile,
-  defaultProfile,
-  Category,
-  Product,
-  Post,
-} from "@/types/profile";
+import { Category, Product, Post } from "@/types/profile";
 import Sidebar from "@/components/Sidebar";
 import Feed from "@/components/Feed";
 import MobileHeader from "./MobileHeader";
@@ -29,6 +22,7 @@ import BottomNav from "./BottomNav";
 import ProductFormModal from "@/components/modals/ProductFormModal";
 import ViewProductModal from "@/components/modals/ViewProductModal";
 import DeleteCategoryModal from "@/components/modals/DeleteCategoryModal";
+import { HomeTopBar } from "@/app/Home/HomeTopBar";
 
 const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Something went wrong";
@@ -38,7 +32,8 @@ const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 
 export default function TradeHubApp() {
   // --- Global State ---
-  const [profile, setProfile] = useLocalStorage<UserProfile>("tradehub_profile", defaultProfile);
+  // The profile comes from the backend (null until loaded)
+  const { profile, error: profileError, saveProfile } = useProfile();
   const [categories, setCategories] = useState<Category[]>([]); // loaded from the API
   const [storeError, setStoreError] = useState<string | null>(null);
   // My posts, loaded from the API (the hook owns load / create / edit / delete / like)
@@ -70,36 +65,6 @@ export default function TradeHubApp() {
       .then(setCategories)
       .catch((err) => setStoreError(errorMessage(err)));
   }, []);
-
-  // --- Migration + first-time setup for profile ---
-  // Backfills new fields on old profiles, renames bio→necessaryInfo,
-  // and generates a uniqueName the first time the profile is loaded.
-  useEffect(() => {
-    const raw = profile as unknown as Record<string, unknown>;
-
-    const missingUniqueName = !profile.uniqueName;
-    const missingEmail = raw.email === undefined;
-    const missingPhone = raw.phone === undefined;
-    const hasOldBio = raw.bio !== undefined && profile.necessaryInfo === undefined;
-
-    if (missingUniqueName || missingEmail || missingPhone || hasOldBio) {
-      const migrated: UserProfile = {
-        ...profile,
-        uniqueName: profile.uniqueName || generateUniqueName(profile.name),
-        email: profile.email ?? "",
-        phone: profile.phone ?? "",
-        necessaryInfo:
-          profile.necessaryInfo ?? (typeof raw.bio === "string" ? raw.bio : ""),
-      };
-      // strip legacy `bio` key so it doesn't linger
-      delete (migrated as unknown as Record<string, unknown>).bio;
-      setProfile(migrated);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-
-
 
   // =========================================
   // PRODUCT HANDLERS  (API first; they throw on failure and ProductFormModal shows the message)
@@ -231,8 +196,27 @@ const handleSubmitOrder = (data: OrderFormData) => {
   // =========================================
   // RENDER
   // =========================================
+  if (!profile) {
+    return (
+      <div className="flex h-[100dvh] w-full items-center justify-center bg-gray-50 text-sm">
+        {profileError ? (
+          <p className="text-red-600">{profileError}</p>
+        ) : (
+          <p className="text-gray-400">Loading...</p>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[100dvh] w-full bg-gray-50 text-gray-900 overflow-hidden">
+    <div className="flex h-[100dvh] w-full flex-col bg-gray-50 text-gray-900 overflow-hidden">
+      {/* Top navbar for tablet and desktop (phones use the mobile header and bottom nav below) */}
+      <div className="hidden md:block">
+        <HomeTopBar profile={profile} active="profile" />
+      </div>
+
+      {/* Sidebar + feed row: takes the height left under the navbar */}
+      <div className="flex min-h-0 w-full flex-1">
       {/* Mobile header (hidden on md+) */}
       <MobileHeader
         onMenuClick={() => setIsDrawerOpen(true)}
@@ -243,7 +227,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
       {/* Sidebar — drawer on mobile, static on tablet/desktop */}
       <Sidebar
         profile={profile}
-        setProfile={setProfile}
+        onSaveProfile={saveProfile}
         categories={categories}
         storeError={storeError}
         activeCategoryId={activeCategoryId}
@@ -270,6 +254,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
         onToggleLike={toggleLike}
         onOrderPost={handleOrderFromPost}
         />
+      </div>
 
       {/* Mobile bottom nav (hidden on md+) */}
       <BottomNav

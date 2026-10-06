@@ -2,16 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { usePosts } from "@/hooks/usePosts";
+import { useProfile } from "../../hooks/useProfile";
+import { usePosts } from "../../hooks/usePosts";
 import { fetchCategories } from "@/lib/store-api";
-import {
-  UserProfile,
-  defaultProfile,
-  Category,
-  Product,
-  Post,
-} from "@/types/profile";
+import { Category, Product, Post } from "@/types/profile";
 import Composer from "@/components/Composer";
 import PostCard from "@/components/PostCard";
 import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
@@ -19,8 +13,8 @@ import { HomeTopBar, MobileTabBar } from "./HomeTopBar";
 import { LeftRail, RightRail } from "./HomeSideRails";
 
 export default function HomePage() {
-  // The profile is still the localStorage prototype (wired in a later step).
-  const [profile] = useLocalStorage<UserProfile>("tradehub_profile", defaultProfile);
+  // The profile comes from the backend (null until loaded)
+  const { profile, error: profileError } = useProfile();
   // Categories (with their products) come from the API; the Composer needs them to attach a product.
   const [categories, setCategories] = useState<Category[]>([]);
   // For now Home shows my own posts, same as the Profile page. The real feed rule comes later.
@@ -33,10 +27,13 @@ export default function HomePage() {
       .catch((err) => console.error(err));
   }, []);
 
-  // localStorage only exists in the browser; wait for mount so server and client HTML match.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="min-h-[100dvh] bg-slate-100" />;
+  if (!profile) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
+        {profileError && <p className="text-red-600">{profileError}</p>}
+      </div>
+    );
+  }
 
   const handleOrderPost = (post: Post) => {
     if (post.product) setOrderingProduct(post.product);

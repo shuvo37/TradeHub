@@ -3,7 +3,8 @@
 
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { getUser } from "@/lib/auth-store";
-import { fetchComments, addComment, updateComment, deleteComment } from "@/lib/comments-api";
+import { timeAgo } from "@/lib/time";
+import { fetchCommentsPage, addComment, updateComment, deleteComment } from "@/lib/comments-api";
 import type { Comment } from "@/types/profile";
 
 interface Props {
@@ -42,6 +43,12 @@ export default function CommentSection({
 }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  // Paging: `cursor` is the createdAt of the last comment that came FROM THE SERVER.
+  // It is not the last comment on screen, because a comment you just posted is shown at the end
+  // even when older ones are still waiting to be loaded.
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,15 +64,40 @@ export default function CommentSection({
 
   const me = getUser(); // the logged-in user (already restored by the time anyone opens comments)
 
+  // First page (5 comments, oldest first)
   useEffect(() => {
-    fetchComments(postId)
-      .then((list) => {
-        setComments(list);
-        setCommentCount(list.length); // the list is the truth, even if others commented since the page loaded
+    fetchCommentsPage(postId)
+      .then((page) => {
+        setComments(page.items);
+        setHasMore(page.hasMore);
+        setCursor(page.items.at(-1)?.createdAt);
       })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
-  }, [postId, setCommentCount]);
+  }, [postId]);
+
+  // "View more comments": the next 5 after the cursor
+  const handleLoadMore = async () => {
+    if (loadingMore) return;
+    setError(null);
+    setLoadingMore(true);
+    try {
+      const page = await fetchCommentsPage(postId, cursor);
+      setComments((prev) => {
+        // A comment you posted yourself can come back in a later page, so skip ones already shown,
+        // then keep everything in oldest-first order.
+        const shown = new Set(prev.map((c) => c.id));
+        const merged = [...prev, ...page.items.filter((c) => !shown.has(c.id))];
+        return merged.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      });
+      setHasMore(page.hasMore);
+      setCursor(page.items.at(-1)?.createdAt ?? cursor);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Close the open menu when the user presses anywhere outside it
   useEffect(() => {
@@ -156,7 +188,10 @@ export default function CommentSection({
                 <Avatar name={c.authorName} avatar={c.authorAvatar} size="w-7 h-7" />
                 <div className="flex-1 min-w-0 bg-white rounded-xl px-3 py-1.5 border border-gray-100">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold text-gray-800">{c.authorName}</p>
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{c.authorName}</p>
+                      <span className="text-[10px] text-gray-400 shrink-0">{timeAgo(c.createdAt)}</span>
+                    </div>
 
                     {(canEdit || canDelete) && !isEditing && (
                       <div
@@ -239,6 +274,16 @@ export default function CommentSection({
             );
           })}
         </div>
+      )}
+
+      {hasMore && (
+        <button
+          onClick={handleLoadMore}
+          disabled={loadingMore}
+          className="self-start text-xs font-semibold text-gray-500 hover:text-gray-700 hover:underline disabled:opacity-60"
+        >
+          {loadingMore ? "Loading..." : "View more comments"}
+        </button>
       )}
 
       {error && <p className="text-xs text-red-600">{error}</p>}

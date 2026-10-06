@@ -1,13 +1,14 @@
 // src/components/PostCard.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Post } from "@/types/profile";
 import CommentSection from "./CommentSection";
 
 interface Props {
   post: Post;
   currentUserId: string | null;
+  onEdit: (postId: string, text: string) => Promise<void>;
   onDelete: (postId: string) => void;
   onToggleLike: (postId: string) => Promise<void>;
   onOrder: (post: Post) => void;
@@ -24,13 +25,37 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export default function PostCard({ post, currentUserId, onDelete, onToggleLike, onOrder }: Props) {
+export default function PostCard({
+  post,
+  currentUserId,
+  onEdit,
+  onDelete,
+  onToggleLike,
+  onOrder,
+}: Props) {
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likePulse, setLikePulse] = useState(false);
   const [showComments, setShowComments] = useState(false);
   // The comment count lives here, because only this card and its comment list change it.
   const [commentCount, setCommentCount] = useState(post.commentCount);
+
+  // Editing the post's text (the image and the attached product can't be changed)
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Close the three-dot menu when the user presses anywhere outside it
+  useEffect(() => {
+    if (!showMenu) return;
+    const close = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showMenu]);
 
   const handleLikeClick = async () => {
     // One request at a time: two quick clicks could otherwise reach the server in the wrong order.
@@ -47,8 +72,36 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
     }
   };
 
-  // Only the author can delete a post (the backend enforces it too)
-  const canDelete = post.authorId === currentUserId;
+  const startEdit = () => {
+    setShowMenu(false);
+    setEditError(null);
+    setEditText(post.text);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditError(null);
+  };
+
+  // The backend decides what is allowed (for example, a post with no image and no product needs text),
+  // and its message is shown here. On failure the card stays in edit mode so nothing typed is lost.
+  const handleSaveEdit = async () => {
+    if (savingEdit) return;
+    setEditError(null);
+    setSavingEdit(true);
+    try {
+      await onEdit(post.id, editText);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Only the author can edit or delete a post (the backend enforces it too)
+  const isAuthor = post.authorId === currentUserId;
   const product = post.product;
 
   const renderAvailabilityBadge = (qty: number | "Available" | "Unavailable") => {
@@ -95,8 +148,8 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
           </p>
         </div>
 
-        {canDelete && (
-          <div className="relative">
+        {isAuthor && (
+          <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="w-9 h-9 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 active:bg-gray-200 transition-colors"
@@ -108,6 +161,12 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
             </button>
             {showMenu && (
               <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 min-w-[140px]">
+                <button
+                  onClick={startEdit}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Edit Post
+                </button>
                 <button
                   onClick={() => {
                     setShowMenu(false);
@@ -123,11 +182,40 @@ export default function PostCard({ post, currentUserId, onDelete, onToggleLike, 
         )}
       </div>
 
-      {/* Text */}
-      {post.text && (
-        <p className="px-3 sm:px-4 pb-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-          {post.text}
-        </p>
+      {/* Text (or the edit box) */}
+      {editing ? (
+        <div className="px-3 sm:px-4 pb-3 flex flex-col gap-2">
+          <textarea
+            autoFocus
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && cancelEdit()}
+            rows={3}
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+          />
+          {editError && <p className="text-xs text-red-600">{editError}</p>}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={cancelEdit}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              disabled={savingEdit}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {savingEdit ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        post.text && (
+          <p className="px-3 sm:px-4 pb-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+            {post.text}
+          </p>
+        )
       )}
 
       {/* Image */}

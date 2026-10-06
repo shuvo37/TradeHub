@@ -4,10 +4,17 @@ import type { Comment } from "@/types/profile";
 
 // The backend's CommentDto and the UI's Comment have the same shape, so nothing is converted.
 
-// Oldest first (the backend already sorts them)
-export async function fetchComments(postId: string): Promise<Comment[]> {
-  const res = await apiRequest(`/api/comments/post/${postId}/allComment`);
-  return (await res.json()) as Comment[];
+// One page of comments, oldest first (the backend decides the page size: 5).
+// `after` is the createdAt of the last comment you already have; leave it out for the first page.
+export interface CommentPage {
+  items: Comment[];
+  hasMore: boolean;
+}
+
+export async function fetchCommentsPage(postId: string, after?: string): Promise<CommentPage> {
+  const query = after ? `?after=${encodeURIComponent(after)}` : "";
+  const res = await apiRequest(`/api/comments/post/${postId}/page${query}`);
+  return (await res.json()) as CommentPage;
 }
 
 // Returns the saved comment, with the author's name and avatar filled in by the server

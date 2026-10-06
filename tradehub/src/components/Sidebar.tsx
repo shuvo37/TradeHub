@@ -7,7 +7,7 @@ import { uploadImage } from "@/lib/api";
 
 interface Props {
   profile: UserProfile;
-  setProfile: (p: UserProfile) => void;
+  onSaveProfile: (p: UserProfile) => Promise<void>; // throws with the backend's message on failure
   categories: Category[];
   storeError: string | null;
   activeCategoryId: string | null;
@@ -23,7 +23,7 @@ interface Props {
 
 export default function Sidebar({
   profile,
-  setProfile,
+  onSaveProfile,
   categories,
   storeError,
   activeCategoryId,
@@ -41,6 +41,8 @@ export default function Sidebar({
   const [tempProfile, setTempProfile] = useState<UserProfile>(profile);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Category State ---
@@ -111,14 +113,25 @@ export default function Sidebar({
     }
   };
 
-  const handleSaveProfile = () => {
-    setProfile(tempProfile);
-    setIsEditing(false);
+  // API first: close the form only after the server says OK; on an error keep the draft open.
+  const handleSaveProfile = async () => {
+    if (profileSaving) return;
+    setProfileError(null);
+    setProfileSaving(true);
+    try {
+      await onSaveProfile(tempProfile);
+      setIsEditing(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const handleCancelProfile = () => {
     setTempProfile(profile);
     setAvatarError(null);
+    setProfileError(null);
     setIsEditing(false);
   };
 
@@ -232,7 +245,10 @@ export default function Sidebar({
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold tracking-tight">Profile</h2>
             <button
-              onClick={() => setIsEditing(!isEditing)}
+              onClick={() => {
+                setProfileError(null);
+                setIsEditing(!isEditing);
+              }}
               className="text-sm font-medium text-blue-600 hover:text-blue-800"
             >
               {isEditing ? "Cancel" : "Edit"}
@@ -437,6 +453,9 @@ export default function Sidebar({
                   Please enter a valid email address.
                 </p>
               )}
+              {profileError && (
+                <p className="text-xs text-red-600 px-1">{profileError}</p>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={handleCancelProfile}
@@ -446,14 +465,14 @@ export default function Sidebar({
                 </button>
                 <button
                   onClick={handleSaveProfile}
-                  disabled={!emailValid || avatarUploading}
+                  disabled={!emailValid || avatarUploading || profileSaving}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors ${
-                    emailValid && !avatarUploading
+                    emailValid && !avatarUploading && !profileSaving
                       ? "bg-blue-600 text-white hover:bg-blue-700"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  {avatarUploading ? "Uploading..." : "Save"}
+                  {avatarUploading ? "Uploading..." : profileSaving ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>

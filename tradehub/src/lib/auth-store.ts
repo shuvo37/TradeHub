@@ -14,6 +14,11 @@ export function setAuth(user: AuthResponse) {
   currentUser = user;
 }
 
+// Changes profile fields on the logged-in user without touching the token.
+export function updateUser(patch: Partial<Omit<AuthResponse, "accessToken" | "id">>) {
+  if (currentUser) currentUser = { ...currentUser, ...patch };
+}
+
 export function clearAuth() {
   accessToken = null;
   currentUser = null;
