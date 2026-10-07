@@ -7,22 +7,28 @@ import { uploadImage } from "@/lib/api";
 
 interface Props {
   profile: UserProfile;
-  onSaveProfile: (p: UserProfile) => Promise<void>; // throws with the backend's message on failure
+  // readOnly = visiting someone else's profile: no editing at all. The handlers below
+  // that change data (save profile, add/rename/delete category, add product) are then not passed.
+  readOnly?: boolean;
+  friendAction?: React.ReactNode; // the friend button, shown under the name when visiting someone
+  onSaveProfile?: (p: UserProfile) => Promise<void>; // throws with the backend's message on failure
   categories: Category[];
   storeError: string | null;
   activeCategoryId: string | null;
   setActiveCategoryId: (id: string | null) => void;
-  openProductModal: (product: Product | null, categoryId: string) => void;
+  openProductModal?: (product: Product | null, categoryId: string) => void;
   setViewingProduct: (p: Product | null) => void;
-  onAddCategory: (name: string) => Promise<boolean>;
-  onRequestDeleteCategory: (category: Category) => void;
-  onRenameCategory: (categoryId: string, newName: string) => void;
+  onAddCategory?: (name: string) => Promise<boolean>;
+  onRequestDeleteCategory?: (category: Category) => void;
+  onRenameCategory?: (categoryId: string, newName: string) => void;
   isDrawerOpen: boolean;
   onCloseDrawer: () => void;
 }
 
 export default function Sidebar({
   profile,
+  readOnly = false,
+  friendAction,
   onSaveProfile,
   categories,
   storeError,
@@ -119,7 +125,7 @@ export default function Sidebar({
     setProfileError(null);
     setProfileSaving(true);
     try {
-      await onSaveProfile(tempProfile);
+      await onSaveProfile?.(tempProfile);
       setIsEditing(false);
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : "Something went wrong");
@@ -140,7 +146,7 @@ export default function Sidebar({
     const name = newCategoryName.trim();
     if (!name) return;
 
-    const ok = await onAddCategory(name);
+    const ok = await onAddCategory?.(name);
     if (!ok) return; // keep the input open so the user can fix the name
 
     setNewCategoryName("");
@@ -161,7 +167,7 @@ export default function Sidebar({
   const handleDeleteClick = (e: React.MouseEvent, cat: Category) => {
     e.stopPropagation();
     setOpenMenuId(null);
-    onRequestDeleteCategory(cat);
+    onRequestDeleteCategory?.(cat);
   };
 
   const handleRenameClick = (e: React.MouseEvent, cat: Category) => {
@@ -172,7 +178,7 @@ export default function Sidebar({
   };
 
   const commitRename = () => {
-    if (renamingCategoryId) onRenameCategory(renamingCategoryId, renameValue);
+    if (renamingCategoryId) onRenameCategory?.(renamingCategoryId, renameValue);
     setRenamingCategoryId(null);
     setRenameValue("");
   };
@@ -244,15 +250,17 @@ export default function Sidebar({
           {/* --- PROFILE SECTION --- */}
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold tracking-tight">Profile</h2>
-            <button
-              onClick={() => {
-                setProfileError(null);
-                setIsEditing(!isEditing);
-              }}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800"
-            >
-              {isEditing ? "Cancel" : "Edit"}
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => {
+                  setProfileError(null);
+                  setIsEditing(!isEditing);
+                }}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                {isEditing ? "Cancel" : "Edit"}
+              </button>
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-4">
@@ -312,6 +320,7 @@ export default function Sidebar({
                 )}
               </div>
             )}
+            {readOnly && friendAction}
           </div>
 
           {isEditing ? (
@@ -481,14 +490,18 @@ export default function Sidebar({
           {/* --- CATEGORIES & PRODUCTS SECTION --- */}
           <div className="pt-6 border-t border-gray-200 flex flex-col gap-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold tracking-tight">My Store</h2>
-              <button
-                onClick={() => setIsAddingCategory(true)}
-                className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors"
-                title="Add Category"
-              >
-                +
-              </button>
+              <h2 className="text-lg font-bold tracking-tight">
+                {readOnly ? "Store" : "My Store"}
+              </h2>
+              {!readOnly && (
+                <button
+                  onClick={() => setIsAddingCategory(true)}
+                  className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors"
+                  title="Add Category"
+                >
+                  +
+                </button>
+              )}
             </div>
 
             {storeError && <p className="text-xs text-red-600">{storeError}</p>}
@@ -607,6 +620,8 @@ export default function Sidebar({
                         )}
                       </button>
 
+                      {!readOnly && (
+                      <>
                       <button
                         onClick={(e) => handleMenuToggle(e, cat.id)}
                         className={`absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-all ${
@@ -667,6 +682,8 @@ export default function Sidebar({
                           </button>
                         </div>
                       )}
+                      </>
+                      )}
                     </>
                   )}
                 </div>
@@ -675,7 +692,7 @@ export default function Sidebar({
               {/* Empty states */}
               {categories.length === 0 && !isAddingCategory && (
                 <p className="text-xs text-gray-400 italic text-center py-2">
-                  No categories yet. Click + to add.
+                  {readOnly ? "No categories yet." : "No categories yet. Click + to add."}
                 </p>
               )}
               {categories.length > 0 &&
@@ -694,12 +711,14 @@ export default function Sidebar({
                   <h3 className="text-sm font-semibold text-gray-700">
                     {activeCategory.name} Products
                   </h3>
-                  <button
-                    onClick={() => openProductModal(null, activeCategory.id)}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
-                  >
-                    + Add Product
-                  </button>
+                  {!readOnly && (
+                    <button
+                      onClick={() => openProductModal?.(null, activeCategory.id)}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                    >
+                      + Add Product
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

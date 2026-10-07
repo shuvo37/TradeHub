@@ -2,11 +2,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useProfile } from "@/hooks/useProfile";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { usePosts } from "@/hooks/usePosts";
 import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
 import {
   fetchCategories,
+  fetchCategoriesByUser,
   createCategory,
   renameCategory,
   deleteCategory,
@@ -17,6 +20,7 @@ import {
 import { Category, Product, Post } from "@/types/profile";
 import Sidebar from "@/components/Sidebar";
 import Feed from "@/components/Feed";
+import FriendButton from "@/components/FriendButton";
 import MobileHeader from "./MobileHeader";
 import BottomNav from "./BottomNav";
 import ProductFormModal from "@/components/modals/ProductFormModal";
@@ -30,10 +34,21 @@ const errorMessage = (err: unknown) =>
 // Same order the backend uses (by name), so a new/renamed category lands where a reload would put it.
 const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 
-export default function TradeHubApp() {
+// One page for both cases:
+//   <TradeHubApp />               -> my own profile (/Profile): everything can be edited
+//   <TradeHubApp userId="..." />  -> someone else's profile (/User/[id]): the same page, read-only
+export default function TradeHubApp({ userId }: { userId?: string }) {
+  const router = useRouter();
+  const readOnly = userId !== undefined; // visiting someone else
+
   // --- Global State ---
-  // The profile comes from the backend (null until loaded)
-  const { profile, error: profileError, saveProfile } = useProfile();
+  // `me` is the logged-in user (always loaded: the top bar shows my avatar, and my own page edits it).
+  const { profile: me, error: meError, saveProfile } = useProfile();
+  // `viewed` is the user whose page this is when visiting; it stays null on my own page.
+  const { profile: viewed, error: viewedError } = useUserProfile(userId);
+  // The profile this page shows
+  const profile = readOnly ? viewed : me;
+  const profileError = meError ?? viewedError;
   const [categories, setCategories] = useState<Category[]>([]); // loaded from the API
   const [storeError, setStoreError] = useState<string | null>(null);
   // My posts, loaded from the API (the hook owns load / create / edit / delete / like)
@@ -45,7 +60,7 @@ export default function TradeHubApp() {
     editPost,
     deletePost,
     toggleLike,
-  } = usePosts();
+  } = usePosts(userId);
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -59,12 +74,17 @@ export default function TradeHubApp() {
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [orderingProduct, setOrderingProduct] = useState<Product | null>(null);
 
-  // --- Load My Store (categories + products) from the backend ---
+  // --- Load the store (categories + products) from the backend: mine, or the visited user's ---
   useEffect(() => {
-    fetchCategories()
+    (userId ? fetchCategoriesByUser(userId) : fetchCategories())
       .then(setCategories)
       .catch((err) => setStoreError(errorMessage(err)));
-  }, []);
+  }, [userId]);
+
+  // /User/<my own id> is just my own page, so send me to /Profile where I can edit
+  useEffect(() => {
+    if (userId && myId === userId) router.replace("/Profile");
+  }, [userId, myId, router]);
 
   // =========================================
   // PRODUCT HANDLERS  (API first; they throw on failure and ProductFormModal shows the message)
@@ -193,10 +213,21 @@ const handleSubmitOrder = (data: OrderFormData) => {
     if (post.product) setOrderingProduct(post.product);
   };
 
+  // What only the owner can do. A visitor gets none of these, so the Sidebar shows no edit controls.
+  const ownerActions = readOnly
+    ? {}
+    : {
+        onSaveProfile: saveProfile,
+        openProductModal: handleOpenProductModal,
+        onAddCategory: handleAddCategory,
+        onRequestDeleteCategory: setDeletingCategory,
+        onRenameCategory: handleRenameCategory,
+      };
+
   // =========================================
   // RENDER
   // =========================================
-  if (!profile) {
+  if (!me || !profile) {
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-gray-50 text-sm">
         {profileError ? (
@@ -212,7 +243,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
     <div className="flex h-[100dvh] w-full flex-col bg-gray-50 text-gray-900 overflow-hidden">
       {/* Top navbar for tablet and desktop (phones use the mobile header and bottom nav below) */}
       <div className="hidden md:block">
-        <HomeTopBar profile={profile} active="profile" />
+        <HomeTopBar profile={me} active={readOnly ? null : "profile"} />
       </div>
 
       {/* Sidebar + feed row: takes the height left under the navbar */}
@@ -220,23 +251,21 @@ const handleSubmitOrder = (data: OrderFormData) => {
       {/* Mobile header (hidden on md+) */}
       <MobileHeader
         onMenuClick={() => setIsDrawerOpen(true)}
-        userName={profile.name}
-        userAvatar={profile.avatar}
+        userName={me.name}
+        userAvatar={me.avatar}
       />
 
       {/* Sidebar — drawer on mobile, static on tablet/desktop */}
       <Sidebar
         profile={profile}
-        onSaveProfile={saveProfile}
+        readOnly={readOnly}
+        friendAction={userId ? <FriendButton userId={userId} /> : undefined}
+        {...ownerActions}
         categories={categories}
         storeError={storeError}
         activeCategoryId={activeCategoryId}
         setActiveCategoryId={setActiveCategoryId}
-        openProductModal={handleOpenProductModal}
         setViewingProduct={setViewingProduct}
-        onAddCategory={handleAddCategory}
-        onRequestDeleteCategory={setDeletingCategory}
-        onRenameCategory={handleRenameCategory}
         isDrawerOpen={isDrawerOpen}
         onCloseDrawer={() => setIsDrawerOpen(false)}
       />
@@ -253,6 +282,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
         onDeletePost={deletePost}
         onToggleLike={toggleLike}
         onOrderPost={handleOrderFromPost}
+        readOnly={readOnly}
         />
       </div>
 
@@ -263,35 +293,33 @@ const handleSubmitOrder = (data: OrderFormData) => {
         onProfileClick={() => setIsDrawerOpen(true)}
       />
 
-      {/* Modals */}
-      <ProductFormModal
-        isOpen={isProductModalOpen}
-        onClose={() => setIsProductModalOpen(false)}
-        onSave={handleSaveProduct}
-        onDelete={handleDeleteProduct}
-        editingProduct={editingProduct}
-        tempProduct={tempProduct}
-        setTempProduct={setTempProduct}
-      />
+      {/* Modals. The editing ones exist only on my own page. */}
+      {!readOnly && (
+        <ProductFormModal
+          isOpen={isProductModalOpen}
+          onClose={() => setIsProductModalOpen(false)}
+          onSave={handleSaveProduct}
+          onDelete={handleDeleteProduct}
+          editingProduct={editingProduct}
+          tempProduct={tempProduct}
+          setTempProduct={setTempProduct}
+        />
+      )}
 
         <ViewProductModal
         product={viewingProduct}
         onClose={() => setViewingProduct(null)}
-        onEdit={handleOpenProductFromView}
+        onEdit={readOnly ? undefined : handleOpenProductFromView}
         onOrder={handleOrderProduct}
         />
 
-      <DeleteCategoryModal
-        category={deletingCategory}
-        onClose={() => setDeletingCategory(null)}
-        onConfirm={handleConfirmDeleteCategory}
-      />
-
-        <OrderFormModal
-        product={orderingProduct}
-        onClose={() => setOrderingProduct(null)}
-        onSubmit={handleSubmitOrder}
+      {!readOnly && (
+        <DeleteCategoryModal
+          category={deletingCategory}
+          onClose={() => setDeletingCategory(null)}
+          onConfirm={handleConfirmDeleteCategory}
         />
+      )}
 
         <OrderFormModal
         key={orderingProduct?.id ?? "no-order"}

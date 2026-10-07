@@ -17,6 +17,7 @@ interface Props {
   onDeletePost: (postId: string) => void;
   onToggleLike: (postId: string) => Promise<void>;
   onOrderPost: (post: Post) => void;
+  readOnly?: boolean; // visiting someone else's profile
 }
 
 export default function Feed({
@@ -30,6 +31,7 @@ export default function Feed({
   onDeletePost,
   onToggleLike,
   onOrderPost,
+  readOnly = false,
 }: Props) {
   return (
     <main className="flex-1 h-[100dvh] overflow-y-auto bg-gray-100 pt-14 pb-16 md:pt-0 md:pb-0">
@@ -57,7 +59,9 @@ export default function Feed({
             </div>
             <h3 className="text-lg font-semibold text-gray-800">No posts yet</h3>
             <p className="text-sm text-gray-500 mt-1 max-w-xs">
-              Share an update, a product, or just say hello. Your posts will appear here.
+              {readOnly
+                ? `${profile.name} hasn't posted anything yet.`
+                : "Share an update, a product, or just say hello. Your posts will appear here."}
             </p>
           </div>
         ) : (

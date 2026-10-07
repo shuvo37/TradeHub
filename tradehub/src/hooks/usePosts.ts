@@ -17,9 +17,11 @@ import type { Post } from "@/types/profile";
 const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Something went wrong";
 
-// The logged-in user's posts: loads them once, and keeps the list in sync with the server.
+// Posts of one user: mine by default, or the posts of `userId` when someone visits that user's profile.
+// It also keeps the list in sync with the server (create / edit / delete / like).
+// `myId` is always the logged-in user, so a post card knows whether the viewer is the author.
 // Profile and Home both use this, so the load/create/edit/delete/like logic exists in one place.
-export function usePosts() {
+export function usePosts(userId?: string) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +34,10 @@ export function usePosts() {
           return;
         }
         setMyId(user.id);
-        setPosts(await fetchPostsByUser(user.id));
+        setPosts(await fetchPostsByUser(userId ?? user.id));
       })
       .catch((err) => setError(errorMessage(err)));
-  }, []);
+  }, [userId]);
 
   // Throws on failure: the Composer shows the message and keeps the draft.
   const createPost = async (input: NewPost) => {

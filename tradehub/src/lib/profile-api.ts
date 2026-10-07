@@ -32,6 +32,12 @@ export async function fetchMe(): Promise<UserProfile> {
   return toProfile((await res.json()) as UserDto);
 }
 
+// GET /api/users/{id}: another user's profile (for visiting their page). Everything in it is public.
+export async function fetchUserById(id: string): Promise<UserProfile> {
+  const res = await apiRequest(`/api/users/${id}`);
+  return toProfile((await res.json()) as UserDto);
+}
+
 // PUT /api/users/me. Sends only what the backend lets you change (no uniqueName: the server builds it
 // from the name). Returns the saved profile, including the new uniqueName if the name changed.
 export async function updateMe(profile: UserProfile): Promise<UserProfile> {

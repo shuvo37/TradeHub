@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLogout } from "../hooks/useLogout";
 
 interface Props {
   onMenuClick: () => void;
@@ -11,6 +12,7 @@ interface Props {
 
 export default function MobileHeader({ onMenuClick, userName, userAvatar }: Props) {
   const [showMenu, setShowMenu] = useState(false);
+  const logout = useLogout();
 
   return (
     <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 safe-top">
@@ -69,7 +71,10 @@ export default function MobileHeader({ onMenuClick, userName, userAvatar }: Prop
                 Settings
               </button>
               <button
-                onClick={() => setShowMenu(false)}
+                onClick={() => {
+                  setShowMenu(false);
+                  logout();
+                }}
                 className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
               >
                 Log out

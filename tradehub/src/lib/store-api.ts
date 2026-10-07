@@ -46,6 +46,12 @@ export async function fetchCategories(): Promise<Category[]> {
   return ((await res.json()) as CategoryDto[]).map(toCategory);
 }
 
+// GET /api/users/{id}/categories: another user's store (read-only), same shape as my own.
+export async function fetchCategoriesByUser(userId: string): Promise<Category[]> {
+  const res = await apiRequest(`/api/users/${userId}/categories`);
+  return ((await res.json()) as CategoryDto[]).map(toCategory);
+}
+
 export async function createCategory(name: string): Promise<Category> {
   const res = await apiRequest("/api/categories", jsonInit("POST", { name }));
   return toCategory((await res.json()) as CategoryDto);

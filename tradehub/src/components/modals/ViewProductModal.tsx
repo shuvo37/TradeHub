@@ -4,7 +4,7 @@ import { Product } from "@/types/profile";
 interface Props {
   product: Product | null;
   onClose: () => void;
-  onEdit: (product: Product, e: React.MouseEvent) => void;
+  onEdit?: (product: Product, e: React.MouseEvent) => void; // only the owner passes this; visitors get no Edit button
   onOrder: (product: Product) => void;
 }
 
@@ -87,15 +87,17 @@ export default function ViewProductModal({ product, onClose, onEdit, onOrder }: 
           </p>
 
           <div className="flex gap-2 sm:gap-3 mt-4 pt-4 border-t border-gray-100">
-            <button
-              onClick={(e) => {
-                onClose();
-                onEdit(product, e);
-              }}
-              className="flex-1 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Edit
-            </button>
+            {onEdit && (
+              <button
+                onClick={(e) => {
+                  onClose();
+                  onEdit(product, e);
+                }}
+                className="flex-1 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Edit
+              </button>
+            )}
 
               <button
                     disabled={!isOrderable}
