@@ -25,6 +25,22 @@ export interface FriendRequest {
   createdAt: string; // ISO date
 }
 
+// One person in my friends list (FriendDto)
+export interface Friend {
+  userId: string;    // the friend: use it to open the profile or to unfriend
+  name: string;
+  uniqueName: string;
+  avatar: string;    // "" when the user has no avatar
+  location: string;  // "" when not set
+}
+
+// One page (10) of my friends, newest first. nextCursor is sent back as `before` to get the next page.
+export interface FriendsPage {
+  items: Friend[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 // GET /api/friends/status/{userId}
 export async function fetchFriendStatus(userId: string): Promise<FriendInfo> {
   const res = await apiRequest(`/api/friends/status/${userId}`);
@@ -62,4 +78,17 @@ export async function acceptFriendRequest(requestId: string): Promise<void> {
 // DELETE /api/friends/requests/{requestId}: 204 No Content. Decline (receiver) or cancel (sender).
 export async function deleteFriendRequest(requestId: string): Promise<void> {
   await apiRequest(`/api/friends/requests/${requestId}`, { method: "DELETE" });
+}
+
+// GET /api/friends?before=<cursor>: my friends, 10 per page. Omit `before` for the first page.
+// The cursor is sent back exactly as received, URL-encoded.
+export async function fetchFriends(before?: string): Promise<FriendsPage> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : "";
+  const res = await apiRequest(`/api/friends${query}`);
+  return (await res.json()) as FriendsPage;
+}
+
+// DELETE /api/friends/{userId}: 204 No Content. Removes the friendship ({userId} is the friend, not a request id).
+export async function unfriend(userId: string): Promise<void> {
+  await apiRequest(`/api/friends/${userId}`, { method: "DELETE" });
 }
