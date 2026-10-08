@@ -2,7 +2,12 @@
 import { apiRequest } from "@/lib/api";
 
 // What happened.
-export type NotificationType = "FriendRequestReceived" | "FriendRequestAccepted" | "PostCommented";
+export type NotificationType =
+  | "FriendRequestReceived"
+  | "FriendRequestAccepted"
+  | "PostCommented"
+  | "OrderAccepted"   // the seller accepted my order
+  | "OrderRejected";  // the seller rejected my order
 
 // One line of the bell list (NotificationDto). Named AppNotification because the browser
 // already has its own global `Notification` type.
@@ -14,6 +19,7 @@ export interface AppNotification {
   actorUniqueName: string;
   actorAvatar: string;    // "" when the user has no avatar
   postId: string | null;  // only for PostCommented: the post to open in the popup
+  orderId: string | null; // only for OrderAccepted / OrderRejected: the order to show in the summary card
   isRead: boolean;
   createdAt: string;      // ISO date
 }

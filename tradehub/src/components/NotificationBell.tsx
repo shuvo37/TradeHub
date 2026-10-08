@@ -13,6 +13,7 @@ import {
 import { timeAgo } from "@/lib/time";
 import { Avatar, Icon } from "@/app/Home/ui";
 import PostModal from "./PostModal";
+import OrderSummaryModal from "./OrderSummaryModal";
 
 const POLL_MS = 30_000; // how often the red number is refreshed
 
@@ -26,6 +27,10 @@ function describe(n: AppNotification): { text: string; href?: string } {
       return { text: "accepted your friend request", href: `/User/${n.actorId}` };
     case "PostCommented":
       return { text: "commented on your post" };
+    case "OrderAccepted":
+      return { text: "accepted your order" };
+    case "OrderRejected":
+      return { text: "rejected your order" };
   }
 }
 
@@ -38,6 +43,8 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   // The post shown in the popup after a "commented on your post" line is clicked
   const [popupPostId, setPopupPostId] = useState<string | null>(null);
+  // The order shown in the summary card after an "accepted / rejected your order" line is clicked
+  const [popupOrderId, setPopupOrderId] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   // The poll below must not bring the number back while the list is open (everything is read then)
   const openRef = useRef(false);
@@ -170,10 +177,11 @@ export default function NotificationBell() {
                       ) : (
                         <button
                           type="button"
-                          disabled={!n.postId}
+                          disabled={n.type === "PostCommented" ? !n.postId : !n.orderId}
                           onClick={() => {
                             close();
-                            setPopupPostId(n.postId);
+                            if (n.type === "PostCommented") setPopupPostId(n.postId);
+                            else setPopupOrderId(n.orderId);
                           }}
                           className={rowClass}
                         >
@@ -190,6 +198,9 @@ export default function NotificationBell() {
       )}
 
       {popupPostId && <PostModal postId={popupPostId} onClose={() => setPopupPostId(null)} />}
+      {popupOrderId && (
+        <OrderSummaryModal orderId={popupOrderId} onClose={() => setPopupOrderId(null)} />
+      )}
     </div>
   );
 }

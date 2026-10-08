@@ -8,6 +8,7 @@ import UserSearch from "@/components/UserSearch";
 import NotificationBell from "../../components/NotificationBell";
 import { useLogout } from "@/hooks/useLogout";
 import { useRequestCount } from "@/hooks/useFriendRequests";
+import { useOrderCount } from "@/hooks/useOrderCount";
 import { requestFeedRefresh } from "@/lib/feed-refresh";
 import { Avatar, Icon, IconName } from "./ui";
 
@@ -37,27 +38,43 @@ function IconButton({
   badge,
   className = "",
   onClick,
+  href,
+  isActive = false,
 }: {
   icon: IconName;
   label: string;
   badge?: number;
   className?: string;
   onClick?: () => void;
+  href?: string; // a button that opens a page
+  isActive?: boolean; // the page it opens is the one we are on
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${className}`}
-    >
+  const classes = `relative flex h-10 w-10 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+    isActive ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+  } ${className}`;
+  const content = (
+    <>
       <Icon name={icon} />
       {badge ? (
         <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
-          {badge}
+          {badge > 99 ? "99+" : badge}
         </span>
       ) : null}
+    </>
+  );
+  return href ? (
+    <Link
+      href={href}
+      title={label}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
+      className={classes}
+    >
+      {content}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} title={label} aria-label={label} className={classes}>
+      {content}
     </button>
   );
 }
@@ -65,17 +82,22 @@ function IconButton({
 // `active` says which page the bar is on, so the right tab (or the avatar) is highlighted.
 // `requestCount` is the number of new (not yet seen) friend requests. A page that already knows it (the Friends page
 // passes 0) gives it; every other page leaves it out and the bar loads the number itself.
+// `orderCount` works the same way for the bag icon: orders waiting for my answer (the Orders page gives it).
 export function HomeTopBar({
   profile,
   active = "home",
   requestCount,
+  orderCount,
 }: {
   profile: UserProfile;
-  active?: "home" | "friends" | "profile" | null; // null: none of them (for example, while visiting someone else's profile)
+  active?: "home" | "friends" | "profile" | "orders" | null; // null: none of them (for example, while visiting someone else's profile)
   requestCount?: number;
+  orderCount?: number;
 }) {
   const loadedCount = useRequestCount(requestCount !== undefined);
   const waitingRequests = requestCount ?? loadedCount;
+  const loadedOrders = useOrderCount(orderCount !== undefined);
+  const pendingOrders = orderCount ?? loadedOrders;
   // Below the lg width the search box doesn't fit in the bar, so the search icon opens it on its own row
   const [searchOpen, setSearchOpen] = useState(false);
   const logout = useLogout();
@@ -153,7 +175,13 @@ export function HomeTopBar({
             className="lg:hidden"
             onClick={() => setSearchOpen((open) => !open)}
           />
-          <IconButton icon="bag" label="Order requests" badge={2} />
+          <IconButton
+            icon="bag"
+            label="Order requests"
+            badge={pendingOrders}
+            href="/Orders"
+            isActive={active === "orders"}
+          />
           <NotificationBell />
           <Link
             href="/Profile"
@@ -184,22 +212,31 @@ const MOBILE_TABS: { icon: IconName; label: string; href?: string }[] = [
   { icon: "home", label: "Home", href: "/Home" },
   { icon: "users", label: "Friends", href: "/Friends" },
   { icon: "compass", label: "Discover" },
-  { icon: "bag", label: "Orders" },
+  { icon: "bag", label: "Orders", href: "/Orders" },
   { icon: "user", label: "Profile", href: "/Profile" },
 ];
 
 // Which tab label belongs to each page
-const MOBILE_ACTIVE_LABEL = { home: "Home", friends: "Friends", profile: "Profile" } as const;
+const MOBILE_ACTIVE_LABEL = {
+  home: "Home",
+  friends: "Friends",
+  profile: "Profile",
+  orders: "Orders",
+} as const;
 
 export function MobileTabBar({
   active = "home",
   requestCount,
+  orderCount,
 }: {
-  active?: "home" | "friends" | "profile" | null;
+  active?: "home" | "friends" | "profile" | "orders" | null;
   requestCount?: number; // same rule as in HomeTopBar
+  orderCount?: number; // same rule as in HomeTopBar
 }) {
   const loadedCount = useRequestCount(requestCount !== undefined);
   const waitingRequests = requestCount ?? loadedCount;
+  const loadedOrders = useOrderCount(orderCount !== undefined);
+  const pendingOrders = orderCount ?? loadedOrders;
 
   return (
     <nav
@@ -217,6 +254,9 @@ export function MobileTabBar({
             {t.label}
             {t.label === "Friends" && (
               <RequestBadge count={waitingRequests} className="left-1/2 top-1 ml-1" />
+            )}
+            {t.label === "Orders" && (
+              <RequestBadge count={pendingOrders} className="left-1/2 top-1 ml-1" />
             )}
           </>
         );

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useProfile } from "@/hooks/useProfile";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { usePosts } from "@/hooks/usePosts";
-import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
+import OrderFormModal from "@/components/modals/OrderFormModal";
 import {
   fetchCategories,
   fetchCategoriesByUser,
@@ -153,12 +153,6 @@ export default function TradeHubApp({ userId }: { userId?: string }) {
 
   const handleOrderProduct = (product: Product) => {
   setOrderingProduct(product);
-};
-
-const handleSubmitOrder = (data: OrderFormData) => {
-  // For now: do nothing — just close (seller end not built yet)
-  console.log("Order submitted:", data);
-  setOrderingProduct(null);
 };
 
   // =========================================
@@ -327,7 +321,6 @@ const handleSubmitOrder = (data: OrderFormData) => {
         key={orderingProduct?.id ?? "no-order"}
         product={orderingProduct}
         onClose={() => setOrderingProduct(null)}
-        onSubmit={handleSubmitOrder}
         />
     </div>
   );

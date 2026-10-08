@@ -9,7 +9,7 @@ import { fetchCategories } from "@/lib/store-api";
 import { Category, Product, Post } from "@/types/profile";
 import Composer from "@/components/Composer";
 import PostCard from "@/components/PostCard";
-import OrderFormModal, { OrderFormData } from "@/components/modals/OrderFormModal";
+import OrderFormModal from "@/components/modals/OrderFormModal";
 import { HomeTopBar, MobileTabBar } from "./HomeTopBar";
 import { LeftRail, RightRail } from "./HomeSideRails";
 
@@ -71,11 +71,6 @@ export default function HomePage() {
     if (post.product) setOrderingProduct(post.product);
   };
 
-  const handleSubmitOrder = (data: OrderFormData) => {
-    console.log("Order submitted:", data); // same as before: seller end not wired here
-    setOrderingProduct(null);
-  };
-
   return (
     <div className="min-h-[100dvh] bg-slate-100 text-slate-900">
       <HomeTopBar profile={profile} />
@@ -134,7 +129,6 @@ export default function HomePage() {
         key={orderingProduct?.id ?? "no-order"}
         product={orderingProduct}
         onClose={() => setOrderingProduct(null)}
-        onSubmit={handleSubmitOrder}
       />
     </div>
   );
