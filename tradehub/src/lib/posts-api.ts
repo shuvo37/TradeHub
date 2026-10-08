@@ -36,6 +36,12 @@ export async function fetchPostsByUser(userId: string): Promise<Post[]> {
   return ((await res.json()) as PostDto[]).map(toPost);
 }
 
+// One post by id (any logged-in user may read it). Answers 404 "Post not found" if it was deleted.
+export async function fetchPostById(id: string): Promise<Post> {
+  const res = await apiRequest(`/api/posts/${id}`);
+  return toPost((await res.json()) as PostDto);
+}
+
 export async function createPost(input: NewPost): Promise<Post> {
   const res = await apiRequest("/api/posts", jsonInit("POST", input));
   return toPost((await res.json()) as PostDto);

@@ -73,4 +73,5 @@ export default function FriendsPage() {
       <MobileTabBar active="friends" requestCount={0} />
     </div>
   );
+  
 }

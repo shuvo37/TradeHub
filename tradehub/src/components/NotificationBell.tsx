@@ -12,16 +12,20 @@ import {
 } from "../lib/notifications-api";
 import { timeAgo } from "@/lib/time";
 import { Avatar, Icon } from "@/app/Home/ui";
+import PostModal from "./PostModal";
 
 const POLL_MS = 30_000; // how often the red number is refreshed
 
-// What each kind of notification says, and where clicking it goes
-function describe(n: AppNotification): { text: string; href: string } {
+// What each kind of notification says, and where clicking it goes.
+// A line with no href opens a popup instead of changing the page (see PostCommented below).
+function describe(n: AppNotification): { text: string; href?: string } {
   switch (n.type) {
     case "FriendRequestReceived":
       return { text: "sent you a friend request", href: "/Friends" };
     case "FriendRequestAccepted":
       return { text: "accepted your friend request", href: `/User/${n.actorId}` };
+    case "PostCommented":
+      return { text: "commented on your post" };
   }
 }
 
@@ -32,6 +36,8 @@ export default function NotificationBell() {
   const [items, setItems] = useState<AppNotification[] | null>(null); // null = loading
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  // The post shown in the popup after a "commented on your post" line is clicked
+  const [popupPostId, setPopupPostId] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   // The poll below must not bring the number back while the list is open (everything is read then)
   const openRef = useRef(false);
@@ -136,28 +142,44 @@ export default function NotificationBell() {
               <ul>
                 {items.map((n) => {
                   const { text, href } = describe(n);
+                  const rowClass = `flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+                    n.isRead ? "" : "bg-blue-50/70"
+                  }`;
+                  const content = (
+                    <>
+                      <Avatar name={n.actorName} src={n.actorAvatar} className="h-11 w-11 text-base" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-800">
+                          <span className="font-semibold">{n.actorName}</span> {text}
+                        </p>
+                        <p className={`text-xs ${n.isRead ? "text-slate-400" : "font-medium text-blue-600"}`}>
+                          {timeAgo(n.createdAt)}
+                        </p>
+                      </div>
+                      {!n.isRead && (
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-label="Unread" />
+                      )}
+                    </>
+                  );
                   return (
                     <li key={n.id}>
-                      <Link
-                        href={href}
-                        onClick={close}
-                        className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 ${
-                          n.isRead ? "" : "bg-blue-50/70"
-                        }`}
-                      >
-                        <Avatar name={n.actorName} src={n.actorAvatar} className="h-11 w-11 text-base" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm text-slate-800">
-                            <span className="font-semibold">{n.actorName}</span> {text}
-                          </p>
-                          <p className={`text-xs ${n.isRead ? "text-slate-400" : "font-medium text-blue-600"}`}>
-                            {timeAgo(n.createdAt)}
-                          </p>
-                        </div>
-                        {!n.isRead && (
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-label="Unread" />
-                        )}
-                      </Link>
+                      {href ? (
+                        <Link href={href} onClick={close} className={rowClass}>
+                          {content}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!n.postId}
+                          onClick={() => {
+                            close();
+                            setPopupPostId(n.postId);
+                          }}
+                          className={rowClass}
+                        >
+                          {content}
+                        </button>
+                      )}
                     </li>
                   );
                 })}
@@ -166,6 +188,8 @@ export default function NotificationBell() {
           </div>
         </div>
       )}
+
+      {popupPostId && <PostModal postId={popupPostId} onClose={() => setPopupPostId(null)} />}
     </div>
   );
 }

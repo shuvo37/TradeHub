@@ -1,18 +1,19 @@
 // src/lib/notifications-api.ts
 import { apiRequest } from "@/lib/api";
 
-// What happened. Comments will be added here later.
-export type NotificationType = "FriendRequestReceived" | "FriendRequestAccepted";
+// What happened.
+export type NotificationType = "FriendRequestReceived" | "FriendRequestAccepted" | "PostCommented";
 
 // One line of the bell list (NotificationDto). Named AppNotification because the browser
 // already has its own global `Notification` type.
 export interface AppNotification {
   id: string;
   type: NotificationType;
-  actorId: string;        // the person who did it (sent or accepted the request)
+  actorId: string;        // the person who did it (sent or accepted the request, or wrote the comment)
   actorName: string;
   actorUniqueName: string;
   actorAvatar: string;    // "" when the user has no avatar
+  postId: string | null;  // only for PostCommented: the post to open in the popup
   isRead: boolean;
   createdAt: string;      // ISO date
 }
