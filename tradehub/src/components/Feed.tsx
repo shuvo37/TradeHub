@@ -14,6 +14,7 @@ interface Props {
   error: string | null;
   onCreatePost: (post: NewPost) => Promise<void>;
   onEditPost: (postId: string, text: string) => Promise<void>;
+  onRevivePost: (postId: string) => Promise<void>;
   onDeletePost: (postId: string) => void;
   onToggleLike: (postId: string) => Promise<void>;
   onOrderPost: (post: Post) => void;
@@ -28,6 +29,7 @@ export default function Feed({
   error,
   onCreatePost,
   onEditPost,
+  onRevivePost,
   onDeletePost,
   onToggleLike,
   onOrderPost,
@@ -72,6 +74,7 @@ export default function Feed({
                 post={post}
                 currentUserId={currentUserId}
                 onEdit={onEditPost}
+                onRevive={onRevivePost}
                 onDelete={onDeletePost}
                 onToggleLike={onToggleLike}
                 onOrder={onOrderPost}

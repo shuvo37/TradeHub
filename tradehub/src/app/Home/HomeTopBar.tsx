@@ -8,6 +8,7 @@ import UserSearch from "@/components/UserSearch";
 import NotificationBell from "../../components/NotificationBell";
 import { useLogout } from "@/hooks/useLogout";
 import { useRequestCount } from "@/hooks/useFriendRequests";
+import { requestFeedRefresh } from "@/lib/feed-refresh";
 import { Avatar, Icon, IconName } from "./ui";
 
 // href = the tab really navigates; tabs without one are still dummy
@@ -124,6 +125,7 @@ export function HomeTopBar({
                 title={t.label}
                 aria-label={t.label}
                 aria-current={isActive ? "page" : undefined}
+                onClick={t.label === "Home" ? requestFeedRefresh : undefined}
                 className={className}
               >
                 {content}
@@ -223,6 +225,7 @@ export function MobileTabBar({
             key={t.label}
             href={t.href}
             aria-current={isActive ? "page" : undefined}
+            onClick={t.label === "Home" ? requestFeedRefresh : undefined}
             className={className}
           >
             {content}

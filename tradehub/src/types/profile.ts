@@ -44,7 +44,8 @@ export interface Post {
   id: string;
   text: string;
   image: string;          // "" when the post has no image
-  createdAt: string;      // ISO date, e.g. "2026-10-05T04:10:00+00:00"
+  createdAt: string;      // ISO date, e.g. "2026-10-05T04:10:00+00:00". "How long ago" always uses this.
+  revivedAt: string | null; // ISO date of the last revive, null if never revived. The feed sorts by this when set.
   authorId: string;
   authorName: string;
   authorAvatar: string;   // "" when the author has no avatar

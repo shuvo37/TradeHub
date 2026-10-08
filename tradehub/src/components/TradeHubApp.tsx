@@ -58,6 +58,7 @@ export default function TradeHubApp({ userId }: { userId?: string }) {
     error: postsError,
     createPost,
     editPost,
+    revivePost,
     deletePost,
     toggleLike,
   } = usePosts(userId);
@@ -279,6 +280,7 @@ const handleSubmitOrder = (data: OrderFormData) => {
         error={postsError}
         onCreatePost={createPost}
         onEditPost={editPost}
+        onRevivePost={revivePost}
         onDeletePost={deletePost}
         onToggleLike={toggleLike}
         onOrderPost={handleOrderFromPost}

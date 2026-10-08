@@ -9,6 +9,7 @@ interface Props {
   post: Post;
   currentUserId: string | null;
   onEdit: (postId: string, text: string) => Promise<void>;
+  onRevive: (postId: string) => Promise<void>; // rejects with the backend's message when it is too early
   onDelete: (postId: string) => void;
   onToggleLike: (postId: string) => Promise<void>;
   onOrder: (post: Post) => void;
@@ -29,6 +30,7 @@ export default function PostCard({
   post,
   currentUserId,
   onEdit,
+  onRevive,
   onDelete,
   onToggleLike,
   onOrder,
@@ -46,6 +48,9 @@ export default function PostCard({
   const [editText, setEditText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // The result of "Revive post": a short message on the card (success, or the backend's reason), hidden after a few seconds
+  const [reviveNote, setReviveNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   // Close the three-dot menu when the user presses anywhere outside it
   useEffect(() => {
@@ -69,6 +74,24 @@ export default function PostCard({
       await onToggleLike(post.id);
     } finally {
       setLikeBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!reviveNote) return;
+    const timer = setTimeout(() => setReviveNote(null), 5000);
+    return () => clearTimeout(timer);
+  }, [reviveNote]);
+
+  // The backend decides if the post can be revived (once in 24 hours) and its message is shown here,
+  // for example "You can revive this post again in 5h 12m".
+  const handleRevive = async () => {
+    setShowMenu(false);
+    try {
+      await onRevive(post.id);
+      setReviveNote({ text: "Post revived. It is back at the top of your friends' feeds.", ok: true });
+    } catch (err) {
+      setReviveNote({ text: err instanceof Error ? err.message : "Something went wrong", ok: false });
     }
   };
 
@@ -168,6 +191,12 @@ export default function PostCard({
                   Edit Post
                 </button>
                 <button
+                  onClick={handleRevive}
+                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Revive Post
+                </button>
+                <button
                   onClick={() => {
                     setShowMenu(false);
                     onDelete(post.id);
@@ -181,6 +210,15 @@ export default function PostCard({
           </div>
         )}
       </div>
+
+      {reviveNote && (
+        <p
+          role="status"
+          className={`px-3 sm:px-4 pb-2 text-xs ${reviveNote.ok ? "text-green-700" : "text-red-600"}`}
+        >
+          {reviveNote.text}
+        </p>
+      )}
 
       {/* Text (or the edit box) */}
       {editing ? (

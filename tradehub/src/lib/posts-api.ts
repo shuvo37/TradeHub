@@ -9,6 +9,7 @@ interface PostDto {
   text: string;
   image: string;
   createdAt: string;
+  revivedAt: string | null;
   authorId: string;
   authorName: string;
   authorAvatar: string;
@@ -36,6 +37,23 @@ export async function fetchPostsByUser(userId: string): Promise<Post[]> {
   return ((await res.json()) as PostDto[]).map(toPost);
 }
 
+// One page of the news feed: my posts and my friends' posts, newest first (the backend decides the page size: 10).
+// A revived post counts from its revive time, so the order is not the same as the createdAt order.
+// `nextCursor` is where the next page starts. Send it back as `before` exactly as it came (do not reformat it);
+// leave `before` out for the first page. `nextCursor` is null when the page is empty.
+export interface FeedPage {
+  items: Post[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export async function fetchFeed(before?: string): Promise<FeedPage> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : "";
+  const res = await apiRequest(`/api/posts/feed${query}`);
+  const page = (await res.json()) as { items: PostDto[]; hasMore: boolean; nextCursor: string | null };
+  return { items: page.items.map(toPost), hasMore: page.hasMore, nextCursor: page.nextCursor };
+}
+
 // One post by id (any logged-in user may read it). Answers 404 "Post not found" if it was deleted.
 export async function fetchPostById(id: string): Promise<Post> {
   const res = await apiRequest(`/api/posts/${id}`);
@@ -51,6 +69,13 @@ export async function createPost(input: NewPost): Promise<Post> {
 // The backend answers "A post needs text, an image, or a product" if nothing would be left.
 export async function updatePostText(id: string, text: string): Promise<void> {
   await apiRequest(`/api/posts/${id}`, jsonInit("PUT", { text }));
+}
+
+// 204 No Content. Moves my post back to the top of the feed. A post can be revived once in 24 hours
+// (editing shares the same wait). Too early answers 400 with the time left, for example
+// "You can revive this post again in 5h 12m" (apiRequest turns that message into an Error).
+export async function revivePost(id: string): Promise<void> {
+  await apiRequest(`/api/posts/${id}/revive`, { method: "PUT" });
 }
 
 // 204 No Content; the backend also deletes the post's comments
