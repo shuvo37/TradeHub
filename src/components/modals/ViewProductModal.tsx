@@ -6,9 +6,10 @@ interface Props {
   onClose: () => void;
   onEdit?: (product: Product, e: React.MouseEvent) => void; // only the owner passes this; visitors get no Edit button
   onOrder: (product: Product) => void;
+  extra?: React.ReactNode; // optional block under the description (the search results show who sells the product)
 }
 
-export default function ViewProductModal({ product, onClose, onEdit, onOrder }: Props) {
+export default function ViewProductModal({ product, onClose, onEdit, onOrder, extra }: Props) {
   if (!product) return null;
 
   const discount = product.discount ?? 0;
@@ -85,6 +86,8 @@ export default function ViewProductModal({ product, onClose, onEdit, onOrder }: 
           <p className="text-gray-600 text-sm leading-relaxed">
             {product.description || "No description provided."}
           </p>
+
+          {extra}
 
           <div className="flex gap-2 sm:gap-3 mt-4 pt-4 border-t border-gray-100">
             {onEdit && (

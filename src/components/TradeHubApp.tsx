@@ -37,7 +37,15 @@ const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
 // One page for both cases:
 //   <TradeHubApp />               -> my own profile (/Profile): everything can be edited
 //   <TradeHubApp userId="..." />  -> someone else's profile (/User/[id]): the same page, read-only
-export default function TradeHubApp({ userId }: { userId?: string }) {
+// `initialCategoryId` (from /User/<id>?category=<id>, the links in the Discover search) opens that category at the start;
+// on a phone the store drawer opens too, because that is where the category is shown.
+export default function TradeHubApp({
+  userId,
+  initialCategoryId,
+}: {
+  userId?: string;
+  initialCategoryId?: string;
+}) {
   const router = useRouter();
   const readOnly = userId !== undefined; // visiting someone else
 
@@ -63,8 +71,8 @@ export default function TradeHubApp({ userId }: { userId?: string }) {
     toggleLike,
   } = usePosts(userId);
 
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(initialCategoryId ?? null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(initialCategoryId !== undefined);
 
   // --- Modal State ---
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);

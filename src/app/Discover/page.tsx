@@ -5,10 +5,16 @@ import { useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { useSuggestions } from "@/hooks/useSuggestions";
 import { useDiscoverPosts } from "@/hooks/useDiscoverPosts";
+import { useCatalogSearch } from "@/hooks/useCatalogSearch";
 import SuggestionRow from "@/components/SuggestionRow";
 import PostCard from "@/components/PostCard";
+import CatalogSearchBar from "@/components/CatalogSearchBar";
+import CatalogSearchResults from "@/components/CatalogSearchResults";
+import { ProductSellerInfo } from "@/components/ProductSearchCard";
 import OrderFormModal from "@/components/modals/OrderFormModal";
+import ViewProductModal from "@/components/modals/ViewProductModal";
 import { HomeTopBar, MobileTabBar } from "@/app/Home/HomeTopBar";
+import type { ProductSearchItem } from "@/lib/catalog-search-api";
 import type { Post, Product } from "@/types/profile";
 
 // The tabs of the posts side. Only "For you" exists for now; more (for example Popular or New) are added here later.
@@ -20,7 +26,9 @@ const noEdit = async () => {};
 const noRevive = async () => {};
 const noDelete = () => {};
 
-// Discover has two parts. Left: people you may know (the friend suggestions). Right: other people's posts, in tabs.
+// Discover has a search box on top and two parts below it.
+// Left: people you may know (the friend suggestions). Right: other people's posts, in tabs.
+// While a product search is active, the right part shows the search results instead of the posts ("Clear" brings the posts back).
 // From the lg width both parts show side by side; below it only one shows, and the "People" / "Posts" switch picks which.
 export default function DiscoverPage() {
   const { profile: me, error: profileError } = useProfile(); // the top bar shows my avatar
@@ -35,6 +43,9 @@ export default function DiscoverPage() {
     toggleLike,
     loadMore,
   } = useDiscoverPosts();
+  const catalog = useCatalogSearch();
+  const [searchText, setSearchText] = useState(""); // the text in the search box
+  const [viewingProduct, setViewingProduct] = useState<ProductSearchItem | null>(null); // the product popup
   const [orderingProduct, setOrderingProduct] = useState<Product | null>(null);
   const [section, setSection] = useState<"people" | "posts">("people"); // small screens only
   const [postTab, setPostTab] = useState<(typeof POST_TABS)[number]["id"]>("for-you");
@@ -49,6 +60,19 @@ export default function DiscoverPage() {
 
   const handleOrderPost = (post: Post) => {
     if (post.product) setOrderingProduct(post.product);
+  };
+
+  // A search was started (Enter, the Search button, or a click on a line under the box).
+  // On a small screen the results live in the "Posts" part, so go there.
+  const handleSearch = (term: string) => {
+    setSection("posts");
+    void catalog.search(term);
+  };
+
+  // Leave the search: the box is emptied and the posts come back
+  const handleClearSearch = () => {
+    catalog.clear();
+    setSearchText("");
   };
 
   const switchButton = (id: "people" | "posts", label: string) => (
@@ -69,6 +93,14 @@ export default function DiscoverPage() {
       <HomeTopBar profile={me} active="discover" />
 
       <div className="mx-auto max-w-[1100px] px-3 pb-24 pt-4 sm:px-4 md:pb-8">
+        {/* Search products and categories */}
+        <CatalogSearchBar
+          value={searchText}
+          onChange={setSearchText}
+          onSubmit={handleSearch}
+          className="mb-4"
+        />
+
         {/* Small screens: pick which part to see */}
         <div className="mb-3 flex gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm lg:hidden">
           {switchButton("people", "People")}
@@ -103,70 +135,109 @@ export default function DiscoverPage() {
             )}
           </section>
 
-          {/* Right: other people's posts */}
+          {/* Right: search results while a search is active, otherwise other people's posts */}
           <section className={`${section === "posts" ? "block" : "hidden"} min-w-0 flex-1 lg:block`}>
-            <div className="mb-3 flex gap-2" role="tablist" aria-label="Post lists">
-              {POST_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={postTab === tab.id}
-                  onClick={() => setPostTab(tab.id)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                    postTab === tab.id
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {postsError && <p className="px-1 text-xs text-red-600">{postsError}</p>}
-
-              {!postsLoaded ? (
-                <p className="px-1 text-sm text-slate-500">Loading...</p>
-              ) : posts.length === 0 && !hasMore ? (
-                <div className="flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm">
-                  <h2 className="text-lg font-semibold text-slate-800">No posts to show yet</h2>
-                  <p className="mt-1 max-w-xs text-sm text-slate-500">
-                    Posts from people outside your friends list show up here.
-                  </p>
+            {catalog.query !== null ? (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h1 className="min-w-0 truncate text-lg font-bold tracking-tight">
+                    Results for &ldquo;{catalog.query}&rdquo;
+                  </h1>
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+                  >
+                    Clear
+                  </button>
                 </div>
-              ) : (
-                posts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    currentUserId={myId}
-                    onEdit={noEdit}
-                    onRevive={noRevive}
-                    onDelete={noDelete}
-                    onToggleLike={toggleLike}
-                    onOrder={handleOrderPost}
-                  />
-                ))
-              )}
 
-              {hasMore && (
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="mx-auto rounded-full border border-slate-200 bg-white px-6 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60"
-                >
-                  {loadingMore ? "Loading..." : "More"}
-                </button>
-              )}
-            </div>
+                <CatalogSearchResults
+                  query={catalog.query}
+                  products={catalog.products}
+                  categories={catalog.categories}
+                  hasMore={catalog.hasMore}
+                  searching={catalog.searching}
+                  loadingMore={catalog.loadingMore}
+                  error={catalog.error}
+                  onLoadMore={catalog.loadMore}
+                  onOpenProduct={setViewingProduct}
+                />
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex gap-2" role="tablist" aria-label="Post lists">
+                  {POST_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={postTab === tab.id}
+                      onClick={() => setPostTab(tab.id)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                        postTab === tab.id
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 sm:gap-4">
+                  {postsError && <p className="px-1 text-xs text-red-600">{postsError}</p>}
+
+                  {!postsLoaded ? (
+                    <p className="px-1 text-sm text-slate-500">Loading...</p>
+                  ) : posts.length === 0 && !hasMore ? (
+                    <div className="flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm">
+                      <h2 className="text-lg font-semibold text-slate-800">No posts to show yet</h2>
+                      <p className="mt-1 max-w-xs text-sm text-slate-500">
+                        Posts from people outside your friends list show up here.
+                      </p>
+                    </div>
+                  ) : (
+                    posts.map((post) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        currentUserId={myId}
+                        onEdit={noEdit}
+                        onRevive={noRevive}
+                        onDelete={noDelete}
+                        onToggleLike={toggleLike}
+                        onOrder={handleOrderPost}
+                      />
+                    ))
+                  )}
+
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      className="mx-auto rounded-full border border-slate-200 bg-white px-6 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {loadingMore ? "Loading..." : "More"}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </section>
         </div>
       </div>
 
       <MobileTabBar active="discover" />
+
+      {/* The product popup of a search result: the usual product view, plus who sells it */}
+      <ViewProductModal
+        product={viewingProduct ? viewingProduct.product : null}
+        onClose={() => setViewingProduct(null)}
+        onOrder={setOrderingProduct}
+        extra={viewingProduct ? <ProductSellerInfo item={viewingProduct} /> : undefined}
+      />
 
       <OrderFormModal
         key={orderingProduct?.id ?? "no-order"}
