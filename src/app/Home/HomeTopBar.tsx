@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { UserProfile } from "@/types/profile";
 import UserSearch from "@/components/UserSearch";
 import NotificationBell from "../../components/NotificationBell";
-import { useLogout } from "@/hooks/useLogout";
+import AccountMenu from "@/components/AccountMenu";
 import { useRequestCount } from "@/hooks/useFriendRequests";
 import { useOrderCount } from "@/hooks/useOrderCount";
 import { requestFeedRefresh } from "@/lib/feed-refresh";
@@ -100,7 +100,6 @@ export function HomeTopBar({
   const pendingOrders = orderCount ?? loadedOrders;
   // Below the lg width the search box doesn't fit in the bar, so the search icon opens it on its own row
   const [searchOpen, setSearchOpen] = useState(false);
-  const logout = useLogout();
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur">
@@ -195,7 +194,7 @@ export function HomeTopBar({
           >
             <Avatar name={profile.name} src={profile.avatar} className="h-10 w-10 text-sm" />
           </Link>
-          <IconButton icon="logout" label="Log out" onClick={logout} />
+          <AccountMenu />
         </div>
       </div>
 

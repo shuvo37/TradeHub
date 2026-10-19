@@ -11,7 +11,6 @@ import Composer from "@/components/Composer";
 import PostCard from "@/components/PostCard";
 import OrderFormModal from "@/components/modals/OrderFormModal";
 import { HomeTopBar, MobileTabBar } from "./HomeTopBar";
-import { LeftRail } from "./HomeSideRails";
 
 export default function HomePage() {
   // The profile comes from the backend (null until loaded)
@@ -76,8 +75,6 @@ export default function HomePage() {
       <HomeTopBar profile={profile} />
 
       <div className="mx-auto flex max-w-[1400px] justify-center gap-6 px-3 pb-24 pt-4 sm:px-4 md:pb-8">
-        <LeftRail profile={profile} />
-
         <main className="flex w-full min-w-0 max-w-2xl flex-col gap-3 sm:gap-4">
           <Composer profile={profile} categories={categories} onPublish={createPost} />
 
