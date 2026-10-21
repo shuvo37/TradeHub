@@ -5,6 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useFriends } from "@/hooks/useFriends";
 import FriendRow from "@/components/FriendRow";
 import { HomeTopBar, MobileTabBar } from "@/app/Home/HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 
 // My friends, 10 at a time, with an Unfriend button on each. Opened by "Friends" in the Home left rail.
 // "More" replaces the 10 on screen with the next 10.
@@ -15,7 +16,7 @@ export default function FriendListPage() {
   if (!me) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
-        {profileError && <p className="text-red-600">{profileError}</p>}
+        {profileError && <SessionMessage message={profileError} />}
       </div>
     );
   }

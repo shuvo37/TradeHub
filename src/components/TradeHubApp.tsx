@@ -27,6 +27,7 @@ import ProductFormModal from "@/components/modals/ProductFormModal";
 import ViewProductModal from "@/components/modals/ViewProductModal";
 import DeleteCategoryModal from "@/components/modals/DeleteCategoryModal";
 import { HomeTopBar } from "@/app/Home/HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 
 const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Something went wrong";
@@ -234,7 +235,7 @@ export default function TradeHubApp({
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-gray-50 text-sm">
         {profileError ? (
-          <p className="text-red-600">{profileError}</p>
+          <SessionMessage message={profileError} />
         ) : (
           <p className="text-gray-400">Loading...</p>
         )}

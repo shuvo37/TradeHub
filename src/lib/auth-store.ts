@@ -6,6 +6,9 @@ let accessToken: string | null = null;
 let currentUser: AuthResponse | null = null;
 let refreshing: Promise<AuthResponse | null> | null = null;
 
+// The message the hooks show when there is no session. SessionMessage compares against it to show the login button.
+export const NOT_LOGGED_IN = "You are not logged in.";
+
 export const getAccessToken = () => accessToken;
 export const getUser = () => currentUser;
 

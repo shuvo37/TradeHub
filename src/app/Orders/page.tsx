@@ -5,6 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useReceivedOrders } from "@/hooks/useReceivedOrders";
 import OrdersUI from "@/components/OrdersUI";
 import { HomeTopBar, MobileTabBar } from "@/app/Home/HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 
 // The orders other people placed on my products (I am the seller). Opened by the bag icon in the top bar.
 export default function OrdersPage() {
@@ -14,7 +15,7 @@ export default function OrdersPage() {
   if (!me) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
-        {profileError && <p className="text-red-600">{profileError}</p>}
+        {profileError && <SessionMessage message={profileError} />}
       </div>
     );
   }

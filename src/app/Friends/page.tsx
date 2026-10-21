@@ -7,6 +7,7 @@ import { useFriendRequests } from "@/hooks/useFriendRequests";
 import { markRequestsSeen } from "@/lib/friends-api";
 import FriendRequestCard from "@/components/FriendRequestCard";
 import { HomeTopBar, MobileTabBar } from "@/app/Home/HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 
 // All the friend requests I received, like on social media: a card for each person with Confirm / Delete.
 // Opened by the two-people icon in the top bar.
@@ -27,7 +28,7 @@ export default function FriendsPage() {
   if (!me) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
-        {profileError && <p className="text-red-600">{profileError}</p>}
+        {profileError && <SessionMessage message={profileError} />}
       </div>
     );
   }

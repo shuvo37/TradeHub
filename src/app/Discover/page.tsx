@@ -14,6 +14,7 @@ import { ProductSellerInfo } from "@/components/ProductSearchCard";
 import OrderFormModal from "@/components/modals/OrderFormModal";
 import ViewProductModal from "@/components/modals/ViewProductModal";
 import { HomeTopBar, MobileTabBar } from "@/app/Home/HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 import type { ProductSearchItem } from "@/lib/catalog-search-api";
 import type { Post, Product } from "@/types/profile";
 
@@ -53,7 +54,7 @@ export default function DiscoverPage() {
   if (!me) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
-        {profileError && <p className="text-red-600">{profileError}</p>}
+        {profileError && <SessionMessage message={profileError} />}
       </div>
     );
   }

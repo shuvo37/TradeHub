@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureUser } from "@/lib/auth-store";
+import { ensureUser, NOT_LOGGED_IN } from "@/lib/auth-store";
 import { fetchUserById } from "@/lib/profile-api";
 import type { UserProfile } from "@/types/profile";
 
@@ -21,7 +21,7 @@ export function useUserProfile(userId: string | undefined) {
     ensureUser() // after a page reload this restores the session first, so the token exists
       .then(async (user) => {
         if (!user) {
-          setError("You are not logged in.");
+          setError(NOT_LOGGED_IN);
           return;
         }
         setProfile(await fetchUserById(userId));

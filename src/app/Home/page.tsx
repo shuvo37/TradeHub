@@ -11,6 +11,7 @@ import Composer from "@/components/Composer";
 import PostCard from "@/components/PostCard";
 import OrderFormModal from "@/components/modals/OrderFormModal";
 import { HomeTopBar, MobileTabBar } from "./HomeTopBar";
+import SessionMessage from "@/components/SessionMessage";
 
 export default function HomePage() {
   // The profile comes from the backend (null until loaded)
@@ -55,7 +56,7 @@ export default function HomePage() {
   if (!profile) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-100 text-sm">
-        {profileError && <p className="text-red-600">{profileError}</p>}
+        {profileError && <SessionMessage message={profileError} />}
       </div>
     );
   }

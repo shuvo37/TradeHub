@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureUser, updateUser } from "@/lib/auth-store";
+import { ensureUser, updateUser, NOT_LOGGED_IN } from "@/lib/auth-store";
 import { fetchMe, updateMe } from "../lib/profile-api";
 import type { UserProfile } from "@/types/profile";
 
@@ -19,7 +19,7 @@ export function useProfile() {
     ensureUser() // after a page reload this restores the session first, so the token exists
       .then(async (user) => {
         if (!user) {
-          setError("You are not logged in.");
+          setError(NOT_LOGGED_IN);
           return;
         }
         setProfile(await fetchMe());
