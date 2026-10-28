@@ -2,6 +2,7 @@
 "use client";
 
 import AccountMenu from "./AccountMenu";
+import AiAssistant from "./AiAssistant";
 
 interface Props {
   onMenuClick: () => void;
@@ -33,8 +34,11 @@ export default function MobileHeader({ onMenuClick, userName, userAvatar }: Prop
         {/* Brand */}
         <h1 className="text-lg font-bold tracking-tight text-blue-600">TradeHub</h1>
 
-        {/* Three-dot menu: Profile, My friends, Contact email, Log out */}
-        <AccountMenu userName={userName} userAvatar={userAvatar} />
+        <div className="flex items-center gap-2">
+          <AiAssistant />
+          {/* Three-dot menu: Profile, My friends, Contact email, Log out */}
+          <AccountMenu userName={userName} userAvatar={userAvatar} />
+        </div>
       </div>
     </header>
   );

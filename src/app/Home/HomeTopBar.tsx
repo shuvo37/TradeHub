@@ -7,6 +7,7 @@ import type { UserProfile } from "@/types/profile";
 import UserSearch from "@/components/UserSearch";
 import NotificationBell from "../../components/NotificationBell";
 import AccountMenu from "@/components/AccountMenu";
+import AiAssistant from "@/components/AiAssistant";
 import { useRequestCount } from "@/hooks/useFriendRequests";
 import { useOrderCount } from "@/hooks/useOrderCount";
 import { requestFeedRefresh } from "@/lib/feed-refresh";
@@ -182,6 +183,7 @@ export function HomeTopBar({
             href="/Orders"
             isActive={active === "orders"}
           />
+          <AiAssistant />
           <NotificationBell />
           <Link
             href="/Profile"
